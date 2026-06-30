@@ -1,0 +1,72 @@
+using System;
+using SkiaSharp;
+
+namespace __NS__;
+
+// The demo's pure-Skia scene: holds state, advances over time, and draws.
+// IMPORTANT: keep this Uno-free (only SkiaSharp + System) so the same code can
+// render headless thumbnails (see Thumb.cs) and run on the UI canvas (DemoCanvas.cs).
+//
+// Agents: REPLACE the body of Update/Draw with your demo, but keep this public seam:
+//   - parameterless ctor
+//   - void Update(float dt)
+//   - void Draw(SKCanvas canvas, float width, float height)
+//   - the PointerDown/PointerMove/PointerUp/Wheel/Reset input hooks
+// so Thumb.cs and DemoCanvas.cs keep compiling.
+internal sealed class DemoScene
+{
+    private float _time;
+    private float _px = -1, _py = -1;
+    private bool _down;
+
+    public void Update(float dt) => _time += dt;
+
+    public void PointerDown(float x, float y) { _down = true; _px = x; _py = y; }
+    public void PointerMove(float x, float y) { _px = x; _py = y; }
+    public void PointerUp(float x, float y) { _down = false; }
+    public void Wheel(int delta) { }
+    public void Reset() { _time = 0; }
+
+    public void Draw(SKCanvas canvas, float width, float height)
+    {
+        using (var bg = new SKPaint
+        {
+            Shader = SKShader.CreateLinearGradient(
+                new SKPoint(0, 0), new SKPoint(width, height),
+                new[] { new SKColor(0x0B, 0x12, 0x26), new SKColor(0x1B, 0x10, 0x2E) },
+                null, SKShaderTileMode.Clamp)
+        })
+        {
+            canvas.DrawRect(0, 0, width, height, bg);
+        }
+
+        float cx = width / 2f, cy = height / 2f;
+        float r = MathF.Min(width, height) * 0.28f;
+        for (int i = 0; i < 8; i++)
+        {
+            float a = _time + i * MathF.PI / 4f;
+            using var p = new SKPaint
+            {
+                Color = SKColor.FromHsl((i / 8f * 360f + _time * 40f) % 360f, 85, 60),
+                IsAntialias = true,
+            };
+            canvas.DrawCircle(cx + r * MathF.Cos(a), cy + r * MathF.Sin(a), 16, p);
+        }
+
+        if (_px >= 0)
+        {
+            using var ring = new SKPaint
+            {
+                Color = SKColors.White.WithAlpha(180),
+                IsAntialias = true,
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 2,
+            };
+            canvas.DrawCircle(_px, _py, _down ? 26 : 16, ring);
+        }
+
+        using var font = new SKFont(SKTypeface.Default, 22);
+        using var tp = new SKPaint { Color = SKColors.White, IsAntialias = true };
+        canvas.DrawText("__NS__ - replace DemoScene with your demo", cx, height - 28, SKTextAlign.Center, font, tp);
+    }
+}

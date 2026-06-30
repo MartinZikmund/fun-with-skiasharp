@@ -1,0 +1,35 @@
+# ---- .NET build output ----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ---- IDE / tooling ----
+.vs/
+.vscode/
+.idea/
+.playwright-mcp/
+
+# ---- NuGet ----
+*.nupkg
+*.snupkg
+packages/
+
+# ---- Speaker notes / research (intentionally not published) ----
+SkiaSharp4-WhatsNew.md
+_research_doc.md
+
+# ---- Throwaway probes & generated artifacts ----
+_probe/
+gallery_full.png
+_tools/*.png
+_tools/**/bin/
+_tools/**/obj/
+
+# ---- OS cruft ----
+Thumbs.db
+desktop.ini
+.DS_Store

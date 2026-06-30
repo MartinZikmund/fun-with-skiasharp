@@ -1,0 +1,42 @@
+<Page x:Class="LifeBloom.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:LifeBloom"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+  <!-- Grid with a (transparent) Background is reliably hit-testable, so pointer
+       events fire here and are forwarded to the canvas. -->
+  <Grid x:Name="Root" Background="Transparent"
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased"
+        PointerWheelChanged="OnPointerWheel">
+
+    <local:DemoCanvas x:Name="Canvas" />
+
+    <!-- Fluent control overlay: playback + speed, floating bottom-center. -->
+    <Border HorizontalAlignment="Center" VerticalAlignment="Bottom"
+            Margin="0,0,0,28" Padding="14,10"
+            Background="#B0101022" CornerRadius="14"
+            BorderBrush="#33FFFFFF" BorderThickness="1">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Button x:Name="PlayButton" Content="Pause" Width="86" Click="OnPlayPause" />
+        <Button Content="Step" Click="OnStep" />
+        <Button Content="Randomize" Click="OnRandomize" />
+        <Button Content="Clear" Click="OnClear" />
+
+        <Border Width="1" Background="#33FFFFFF" Margin="4,2" />
+
+        <ToggleButton x:Name="EraseToggle" Content="Erase" Checked="OnEraseChanged" Unchecked="OnEraseChanged" />
+
+        <Border Width="1" Background="#33FFFFFF" Margin="4,2" />
+
+        <TextBlock Text="Speed" VerticalAlignment="Center" Foreground="#FFE8E2F4" />
+        <Slider x:Name="SpeedSlider" Width="160" VerticalAlignment="Center"
+                Minimum="0.5" Maximum="30" StepFrequency="0.5" Value="8"
+                ValueChanged="OnSpeedChanged" />
+      </StackPanel>
+    </Border>
+
+  </Grid>
+</Page>

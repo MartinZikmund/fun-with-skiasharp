@@ -1,0 +1,61 @@
+using System;
+using System.Collections.Generic;
+using SkiaSharp;
+
+namespace __NS__;
+
+// The game's pure-Skia logic + rendering. Uno-free (only SkiaSharp + System) so the
+// same code renders headless thumbnails (Thumb.cs) and runs on the UI canvas (GameCanvas.cs).
+//
+// Agents: REPLACE the body with your minigame, but KEEP this public seam so
+// GameCanvas.cs + Thumb.cs keep compiling:
+//   ctor();
+//   void Update(float dt);
+//   void Draw(SKCanvas canvas, float width, float height);
+//   void PointerDown/PointerMove/PointerUp(float x, float y);
+//   void Wheel(int delta);
+//   void KeyDown(string key);   // key is VirtualKey.ToString(): "Left","Right","Up","Down","Space","W","A","S","D","Enter","Escape", letters, "Number1"...
+//   void KeyUp(string key);     // for held-key movement
+//   void Reset();
+// Add fields/methods freely; if you change a signature, update GameCanvas.cs AND Thumb.cs.
+internal sealed class GameScene
+{
+    private readonly HashSet<string> _held = new();
+    private float _x = 200, _y = 200;
+    private float _tx = -1, _ty = -1;
+
+    public void Update(float dt)
+    {
+        float speed = 260f * dt;
+        if (_held.Contains("Left") || _held.Contains("A")) _x -= speed;
+        if (_held.Contains("Right") || _held.Contains("D")) _x += speed;
+        if (_held.Contains("Up") || _held.Contains("W")) _y -= speed;
+        if (_held.Contains("Down") || _held.Contains("S")) _y += speed;
+    }
+
+    public void PointerDown(float x, float y) { _tx = x; _ty = y; }
+    public void PointerMove(float x, float y) { }
+    public void PointerUp(float x, float y) { }
+    public void Wheel(int delta) { }
+    public void KeyDown(string key) { _held.Add(key); }
+    public void KeyUp(string key) { _held.Remove(key); }
+    public void Reset() { _x = 200; _y = 200; _held.Clear(); }
+
+    public void Draw(SKCanvas canvas, float width, float height)
+    {
+        canvas.Clear(new SKColor(0x0B, 0x0E, 0x1A));
+
+        if (_tx >= 0)
+        {
+            using var tgt = new SKPaint { Color = new SKColor(0xFF, 0xD1, 0x66), IsAntialias = true };
+            canvas.DrawCircle(_tx, _ty, 10, tgt);
+        }
+
+        using var p = new SKPaint { Color = new SKColor(0x66, 0xE0, 0xFF), IsAntialias = true };
+        canvas.DrawRect(_x - 18, _y - 18, 36, 36, p);
+
+        using var font = new SKFont(SKTypeface.Default, 22);
+        using var tp = new SKPaint { Color = SKColors.White, IsAntialias = true };
+        canvas.DrawText("__NS__ - replace GameScene with your game (WASD/arrows + mouse)", width / 2f, height - 28, SKTextAlign.Center, font, tp);
+    }
+}

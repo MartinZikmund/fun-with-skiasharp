@@ -1,0 +1,34 @@
+<Page x:Class="SkiaSnake.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:SkiaSnake"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+  <!-- IsTabStop + programmatic Focus makes the Grid receive KeyDown/KeyUp.
+       Transparent Background makes it hit-testable for pointer events. -->
+  <Grid x:Name="Root" Background="Transparent" IsTabStop="True"
+        Loaded="OnLoaded"
+        KeyDown="OnKeyDown"
+        KeyUp="OnKeyUp"
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased"
+        PointerWheelChanged="OnPointerWheel">
+
+    <local:DemoCanvas x:Name="Canvas" />
+
+    <!-- Fluent overlay: a Restart button (score/game-over are drawn in-canvas). -->
+    <Button x:Name="RestartButton"
+            Content="Restart"
+            Click="OnRestartClick"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,40"
+            Padding="20,8"
+            CornerRadius="8"
+            Background="#1A2E2E48"
+            BorderBrush="#6B6BFF8E"
+            Foreground="#6BFF8E" />
+
+  </Grid>
+</Page>

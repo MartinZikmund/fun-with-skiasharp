@@ -1,0 +1,30 @@
+<Page x:Class="Skia2048.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:Skia2048"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+  <!-- IsTabStop + programmatic Focus makes the Grid receive KeyDown/KeyUp.
+       Transparent Background makes it hit-testable for pointer events. -->
+  <Grid x:Name="Root" Background="Transparent" IsTabStop="True"
+        Loaded="OnLoaded"
+        KeyDown="OnKeyDown"
+        KeyUp="OnKeyUp"
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased"
+        PointerWheelChanged="OnPointerWheel">
+
+    <local:DemoCanvas x:Name="Canvas" />
+
+    <!-- Minimal Fluent overlay: a Restart button (score/help drawn on the canvas). -->
+    <Button x:Name="RestartButton"
+            Content="Restart"
+            Click="OnRestartClick"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Margin="0,0,20,16"
+            Padding="16,8" />
+
+  </Grid>
+</Page>

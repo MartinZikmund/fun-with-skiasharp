@@ -1,0 +1,33 @@
+<Page x:Class="MandelbrotVoyage.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:MandelbrotVoyage"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+  <!-- Grid with a (transparent) Background is reliably hit-testable, so pointer
+       events fire here and are forwarded to the canvas. -->
+  <Grid x:Name="Root" Background="Transparent"
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased"
+        PointerWheelChanged="OnPointerWheel">
+
+    <local:DemoCanvas x:Name="Canvas" />
+
+    <!-- Fluent control overlay, top-right, out of the HUD's way. -->
+    <StackPanel Orientation="Horizontal"
+                Spacing="10"
+                Margin="0,20,24,0"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top">
+      <Button x:Name="AutoZoomButton"
+              Content="Pause Auto-Zoom"
+              MinWidth="150"
+              Click="OnToggleAutoZoom" />
+      <Button Content="Reset"
+              MinWidth="80"
+              Click="OnReset" />
+    </StackPanel>
+
+  </Grid>
+</Page>

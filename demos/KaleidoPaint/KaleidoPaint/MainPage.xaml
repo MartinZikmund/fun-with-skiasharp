@@ -1,0 +1,35 @@
+<Page x:Class="KaleidoPaint.MainPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:KaleidoPaint"
+      Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+  <!-- Grid with a (transparent) Background is reliably hit-testable, so pointer
+       events fire here and are forwarded to the canvas. -->
+  <Grid x:Name="Root" Background="Transparent"
+        PointerPressed="OnPointerPressed"
+        PointerMoved="OnPointerMoved"
+        PointerReleased="OnPointerReleased"
+        PointerWheelChanged="OnPointerWheel">
+
+    <local:DemoCanvas x:Name="Canvas" />
+
+    <!-- Fluent controls overlay: symmetry presets + Clear. -->
+    <Border VerticalAlignment="Top" HorizontalAlignment="Center"
+            Margin="0,18,0,0" Padding="10,6"
+            CornerRadius="12"
+            Background="#66000000" BorderBrush="#33FFFFFF" BorderThickness="1">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Symmetry" VerticalAlignment="Center"
+                   Foreground="#CCFFFFFF" Margin="2,0,4,0" FontSize="13" />
+        <Button x:Name="Sym6" Content="6" Click="OnSymmetry" Tag="6" MinWidth="40" />
+        <Button x:Name="Sym8" Content="8" Click="OnSymmetry" Tag="8" MinWidth="40" />
+        <Button x:Name="Sym12" Content="12" Click="OnSymmetry" Tag="12" MinWidth="40" />
+        <Button x:Name="Sym16" Content="16" Click="OnSymmetry" Tag="16" MinWidth="40" />
+        <Rectangle Width="1" Fill="#33FFFFFF" Margin="4,2" />
+        <Button Content="Clear" Click="OnClear" MinWidth="56" />
+      </StackPanel>
+    </Border>
+
+  </Grid>
+</Page>

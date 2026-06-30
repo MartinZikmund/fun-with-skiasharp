@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fun with SkiaSharp - Uno Platform demos</title>
+<style>
+  :root { --bg:#06070d; --line:#222840; --ink:#eef1fb; --dim:#9aa3c0; --c1:#39d0ff; --c2:#ff4fd8; --c3:#7c5cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:
+      radial-gradient(1200px 600px at 15% -10%, #16203f55, transparent),
+      radial-gradient(1000px 500px at 100% 0%, #3a134a55, transparent), var(--bg);
+    color:var(--ink); font:15px/1.55 "Segoe UI",system-ui,sans-serif; }
+  header { padding:54px 28px 22px; max-width:1320px; margin:0 auto; }
+  .kicker { letter-spacing:.32em; text-transform:uppercase; font-size:12px; color:var(--c1); margin:0 0 10px; }
+  h1 { margin:0; font-size:clamp(30px,5vw,52px); line-height:1.05;
+       background:linear-gradient(92deg,var(--c1),var(--c2) 60%,var(--c3));
+       -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { color:var(--dim); margin:14px 0 0; max-width:74ch; }
+  .meta { margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; }
+  .pill { border:1px solid var(--line); background:#0d1020; color:var(--dim); padding:6px 12px; border-radius:999px; font-size:12.5px; }
+  .pill b { color:var(--ink); }
+  .note { max-width:1320px; margin:0 auto; padding:6px 28px 0; color:var(--dim); font-size:13.5px; }
+  .grid { max-width:1320px; margin:18px auto 0; padding:0 22px; display:grid;
+          grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:20px; }
+  .card { background:linear-gradient(180deg,#121627,#0d1020); border:1px solid var(--line);
+          border-radius:16px; overflow:hidden; transition:transform .15s ease, border-color .15s ease, box-shadow .15s; }
+  .card:hover { transform:translateY(-4px); border-color:#39507f; box-shadow:0 14px 40px #000a, 0 0 0 1px #39d0ff22; }
+  .thumbwrap { position:relative; aspect-ratio:11/7; background:#000; overflow:hidden; }
+  .thumbwrap img { width:100%; height:100%; object-fit:cover; display:block; }
+  .rank { position:absolute; top:10px; left:10px; background:#000a; border:1px solid #ffffff22;
+          color:#fff; font-weight:700; font-size:13px; padding:3px 9px; border-radius:8px; backdrop-filter:blur(4px); }
+  .tag { position:absolute; top:10px; right:10px; font-size:11px; padding:3px 9px; border-radius:8px; text-transform:uppercase; letter-spacing:.06em; }
+  .tag.demo { background:#13314a; color:#7fd8ff; border:1px solid #2a6a8e; }
+  .tag.game { background:#3a1340; color:#ff9be8; border:1px solid #7e2d77; }
+  .body { padding:15px 17px 17px; }
+  h3 { margin:0 0 6px; font-size:18px; }
+  .one { margin:0 0 10px; color:#cdd5ef; }
+  .goal { margin:0 0 8px; color:#bfe9d2; font-size:13.5px; }
+  .ctrl { margin:0 0 12px; color:var(--dim); font-size:13px; }
+  .ctrl b, .goal b { color:var(--c1); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { font-size:11px; color:#cbd3f0; background:#1a2138; border:1px solid #2a3354; padding:3px 9px; border-radius:999px; }
+  footer { max-width:1320px; margin:46px auto; padding:22px 28px; color:var(--dim); border-top:1px solid var(--line); font-size:13.5px; }
+  code { background:#0d1020; border:1px solid var(--line); padding:2px 7px; border-radius:6px; color:#cfe6ff; }
+</style></head>
+<body>
+  <header>
+    <p class="kicker">Uno Platform &times; SkiaSharp 4</p>
+    <h1>Fun with SkiaSharp</h1>
+    <p class="sub">Nineteen self-contained Uno Platform apps - twelve visual showpieces and seven playable minigames -
+    each drawing through <code>SKCanvasElement</code> on stable <b>SkiaSharp 4.148.0</b>. Shown below in <b>showcase running order</b> (best first).</p>
+    <div class="meta">
+      <span class="pill"><b>19</b> apps</span>
+      <span class="pill"><b>Uno.Sdk</b> 6.7.0-dev.99</span>
+      <span class="pill"><b>SkiaSharp</b> 4.148.0</span>
+      <span class="pill"><b>net10.0-desktop</b> + wasm</span>
+      <span class="pill">all built &amp; live-verified</span>
+    </div>
+  </header>
+  <p class="note">Run the whole set in order with <code>./present.ps1</code> (close a window to advance). Numbers = showcase order.</p>
+  <div class="grid">
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/ShaderGalaxy/thumb.png" alt="ShaderGalaxy">
+        <span class="rank">01</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>ShaderGalaxy</h3>
+        <p class="one">A living deep-space nebula you stir with your mouse, swirling fbm clouds and a twinkling starfield rendered entirely in one SKSL fragment shader.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Mouse move stirs/swirls the nebula toward the cursor (an eased vortex centre); left-click fires an expanding cyan shockwave from the click point; mouse wheel zooms the nebula in and out. A faint bottom-centre hint line states all three.</p>
+        <div class="chips"><span class="chip">Full-screen SKSL runtime fragment shader (SKRuntimeEffect.CreateShader)</span><span class="chip">Hand-written value-noise + 6-octave fbm in SKSL</span><span class="chip">Two-pass domain warping for billowing cloud structure</span><span class="chip">Mouse-driven swirl: per-pixel rotation around an eased cursor centre</span><span class="chip">Click shockwave: expanding Gaussian ring perturbing the field</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/AuroraFireworks/thumb.png" alt="AuroraFireworks">
+        <span class="rank">02</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>AuroraFireworks</h3>
+        <p class="one">Hundreds of gravity-driven, additive-glow sparks bloom into multicolor fireworks over a living aurora night sky.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Self-running: shells auto-launch periodically. Click to launch a shell toward the clicked point; hold (press-and-release) to charge a bigger/huge burst; mouse wheel fires a celebratory volley. All pointer/wheel input is already wired through MainPage -&gt; DemoCanvas -&gt; DemoScene.</p>
+        <div class="chips"><span class="chip">Particle system (rockets + sparks with gravity and air drag)</span><span class="chip">SKBlendMode.Plus additive glow for sparks, trails, aurora and stars</span><span class="chip">Fading motion trails (sparkly rocket ascent + life-based ease-out alpha)</span><span class="chip">Radial gradient shaders for spark halos, burst flash core and rocket heads</span><span class="chip">Animated aurora ribbons via layered sine curtains (SKPath.AddPoly) with SKMaskFilter blur</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/MandelbrotVoyage/thumb.png" alt="MandelbrotVoyage">
+        <span class="rank">03</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>MandelbrotVoyage</h3>
+        <p class="one">An infinite-zoom Mandelbrot rendered live on the GPU via an SKSL shader, diving forever into a living, color-cycling fractal that you can grab, pan, and zoom by hand.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Auto-zoom dives on its own by default. Drag to pan, mouse wheel to zoom around the cursor (which pauses the dive), and two Fluent buttons toggle Pause/Resume Auto-Zoom and Reset. A live HUD shows the current zoom level and auto-zoom state.</p>
+        <div class="chips"><span class="chip">SKSL runtime shader (SKRuntimeEffect) full-frame Mandelbrot</span><span class="chip">Smooth/continuous escape-time coloring (fractional iteration, log-log normalization) for banding-free gradients</span><span class="chip">Animated cosine (Inigo Quilez) palette with continuous cycling</span><span class="chip">Cardioid + period-2 bulb interior test to skip the black lake cheaply</span><span class="chip">Double-float (hi/lo) center compensation to preserve precision at deep zoom (~1e3+ in thumbnail, up to 1e12)</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SkiaBreakout/thumb.png" alt="SkiaBreakout">
+        <span class="rank">04</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>SkiaBreakout</h3>
+        <p class="one">A juicy SkiaSharp brick-breaker: bounce a glowing ball off a mouse-driven paddle to smash neon brick rows, chain combos, and clear five escalating levels.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Keep the ball alive with the paddle and break every brick to clear the level; you have 3 lives (lose one when the ball falls), score rises with a combo multiplier for fast chains, and clearing all 5 levels wins.</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Move paddle: Mouse X (also A/D or Left/Right arrows). Launch ball / restart after win-lose: Click or Space/Enter. New game anytime: R key or the on-screen &quot;New Game&quot; button.</p>
+        <div class="chips"><span class="chip">Sub-stepped circle-vs-AABB collision (anti-tunneling)</span><span class="chip">Paddle-position-dependent reflection angle</span><span class="chip">Particle burst system with gravity and drag</span><span class="chip">Additive-blend glow (SKBlendMode.Plus) + SKMaskFilter blur</span><span class="chip">Linear/radial SKShader gradients for bricks, paddle, ball, background</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/NeonWaveform/thumb.png" alt="NeonWaveform">
+        <span class="rank">05</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>NeonWaveform</h3>
+        <p class="one">A music visualizer that needs no music: a procedural neon signal explodes into a rainbow circular spectrum ring, a mirrored oscilloscope, and beat-synced pulse rings, all drenched in additive bloom.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Move or drag the mouse from the center outward to pump the &quot;energy&quot; - distance from center raises intensity, tempo (BPM), bar height, and wave amplitude. The mouse wheel adds a momentary energy boost/cut (scroll up = boost, down = cut). The pointer is wired through MainPage -&gt; DemoCanvas -&gt; DemoScene; no extra UI buttons were needed since the whole canvas is the instrument.</p>
+        <div class="chips"><span class="chip">Procedural signal synthesis (drifting sine &#x27;formants&#x27; + broadband shimmer + beat-driven bass kick)</span><span class="chip">Circular spectrum-analyzer ring of 96 mirrored bars radiating from center with per-bar HSL sweep</span><span class="chip">Mirrored oscilloscope time-domain waveform via polyline SKPath (top + bottom)</span><span class="chip">Beat detection driving expanding pulse rings (ring-buffer of timed pulses, BPM scales with energy)</span><span class="chip">Additive bloom (SKBlendMode.Plus) with two-pass blurred-under/crisp-over rendering using SKMaskFilter.CreateBlur</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/FlowField/thumb.png" alt="FlowField">
+        <span class="rank">06</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>FlowField</h3>
+        <p class="one">Four thousand particles ride an invisible curl-noise wind, leaving silky glowing trails that swirl into a vortex wherever you point.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Move the mouse over the canvas to summon a swirling vortex/attractor that bends the flow (gentle pull when hovering, stronger when holding the left button down); mouse wheel up/down changes swirl strength and flips its rotation direction. No on-screen buttons needed - it&#x27;s a pure pointer-driven instrument.</p>
+        <div class="chips"><span class="chip">Procedural curl-noise flow field (divergence-free) built from layered value-noise FBM and a rotated gradient potential</span><span class="chip">Large struct-of-arrays particle system (4000 particles) advected each frame with per-particle speed, life and hue jitter</span><span class="chip">Low-alpha trail accumulation - frame faded with a translucent dark rect each frame instead of clearing, for silky persistence</span><span class="chip">Additive blending (SKBlendMode.Plus) so overlapping streams glow where they cross</span><span class="chip">Position + time + per-particle hue shifting via SKColor.FromHsl for a cyan-to-magenta field that drifts over time</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SkiaFlap/thumb.png" alt="SkiaFlap">
+        <span class="rank">07</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>SkiaFlap</h3>
+        <p class="one">A juicy one-button Flappy clone in pure SkiaSharp — flap a glowing bird through scrolling pipes over a parallax sky.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Gravity pulls the bird down; tap to flap upward and thread it through the gaps in the scrolling pipe pairs — each pipe passed scores +1, and hitting a pipe or the ground ends the run (tap/Space/R to play again).</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Space / Up / W / Enter or Left-Click = flap. R or Escape (or the Restart button) = restart. Click the surface to grab keyboard focus.</p>
+        <div class="chips"><span class="chip">Fixed-clamped timestep gravity/impulse physics</span><span class="chip">Procedurally spaced scrolling obstacles with recycling pool</span><span class="chip">Multi-layer parallax (sky gradient, sun glow, sine-wave hills, drifting clouds, scrolling ground)</span><span class="chip">Circle-vs-rectangle collision</span><span class="chip">Particle systems (flap puff, score pop, death explosion) with additive blending</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/HyperWarp/thumb.png" alt="HyperWarp">
+        <span class="rank">08</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>HyperWarp</h3>
+        <p class="one">Punch it: a neon hyperspace starfield that stretches 900 stars into chromatic light-streaks as you steer the ship and slam the throttle into warp.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Mouse move steers the vanishing point and (near screen edges) pushes the throttle; press-and-hold/drag = full burn; mouse wheel sets sustained throttle. Periodic automatic &quot;warp jumps&quot; flash the screen and elongate every streak. All input flows through the existing MainPage pointer/wheel handlers into DemoCanvas then DemoScene; no new controls were needed.</p>
+        <div class="chips"><span class="chip">Pseudo-3D perspective projection (1/z splay from a movable vanishing point)</span><span class="chip">Speed-proportional streak lines drawn from previous-frame to current-frame projection</span><span class="chip">Additive (SKBlendMode.Plus) glow blending for neon light accumulation</span><span class="chip">Chromatic aberration via R/G/B passes offset along the radial axis</span><span class="chip">Radial + sweep gradient deep-space background with slow nebula rotation</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/KaleidoPaint/thumb.png" alt="KaleidoPaint">
+        <span class="rank">09</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>KaleidoPaint</h3>
+        <p class="one">Drag to paint glowing strokes that bloom into a living, rotating kaleidoscope mandala in real time.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Drag the pointer to paint; top-center Fluent buttons set symmetry (6/8/12/16) and Clear wipes the canvas; mouse wheel also steps the symmetry count.</p>
+        <div class="chips"><span class="chip">N-fold rotational + mirror (dihedral) symmetry via canvas.Save/RotateDegrees/Scale</span><span class="chip">additive glow strokes (SKBlendMode.Plus) with wide soft glow + bright thin core</span><span class="chip">SKPath polyline smoothing with quadratic midpoint curves</span><span class="chip">time+angle HSL hue cycling with breathing pulse</span><span class="chip">radial-gradient pulsing luminous core and vignette background</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/MetaballsLava/thumb.png" alt="MetaballsLava">
+        <span class="rank">10</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>MetaballsLava</h3>
+        <p class="one">A hypnotic lava lamp where gooey, glowing blobs drift, bob, and organically merge into one another, rendered entirely in a single SKSL metaball shader.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Click anywhere to spawn a new hot blob; press-and-drag to attract and heat the nearby blobs (they brighten as they&#x27;re pulled); mouse wheel changes the lamp&#x27;s viscosity (overall drift speed); a Fluent &quot;Reset Lamp&quot; button (top-right) reseeds the lava.</p>
+        <div class="chips"><span class="chip">SKSL runtime shader (SKRuntimeEffect) summing an inverse-square metaball field over up to 12 blobs with a smoothstep surface threshold</span><span class="chip">Warm multi-stop lava palette (deep red -&gt; orange -&gt; yellow-white) driven by field depth, vertical position, heat and a time pulse</span><span class="chip">Gooey rim highlight + soft outer glow bleed computed from the field for the merging-edge look</span><span class="chip">float4[] array uniform packing blob position/radius/heat per frame</span><span class="chip">Dark glassy vertical-gradient background with a radial vignette</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SkiaTris/thumb.png" alt="SkiaTris">
+        <span class="rank">11</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>SkiaTris</h3>
+        <p class="one">Classic Tetris reborn in SkiaSharp — glowing beveled blocks, ghost piece, particle line-clears, and buttery 60fps fixed-timestep gravity.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Steer the falling tetrominoes to fill complete horizontal rows in the 10x20 well; cleared rows flash and score (more for multi-line clears), speed ramps with each level, and it&#x27;s game over when the stack tops out.</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Left/Right (or A/D) move; Up/X/W rotate CW, Z rotate CCW; Down/S soft-drop; Space hard-drop; R restart; Space/Enter restart on game over. Click or the Restart button refocuses/resets.</p>
+        <div class="chips"><span class="chip">7 tetrominoes with 4 rotation states</span><span class="chip">wall-kick rotation incl. floor kick</span><span class="chip">collision detection</span><span class="chip">line-clear detection + stack compaction</span><span class="chip">fixed-timestep gravity accumulator</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SpiroHarmonograph/thumb.png" alt="SpiroHarmonograph">
+        <span class="rank">12</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>SpiroHarmonograph</h3>
+        <p class="one">A hypnotic harmonograph: four damped pendulums combine into a slowly decaying Lissajous figure that draws itself live as a glowing, gradient-coloured polyline, then fades and reincarnates with fresh random parameters.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Mouse: click/drag anywhere for a glowing ripple ring; mouse wheel nudges damping. Fluent overlay (top-right): &quot;Randomize&quot; button spawns a new figure, &quot;Clear&quot; replays the current one from blank, and a &quot;Damping&quot; slider (0.3-2.0) controls how tightly the spiral collapses.</p>
+        <div class="chips"><span class="chip">Parametric/sinusoidal harmonograph curves with exponential damping (amp*sin(freq*t+phase)*e^(-damp*t))</span><span class="chip">Two damped pendulums per axis for rich lacy figures with integer-ish frequency ratios</span><span class="chip">Animated progressive reveal (pen-head rides the leading edge), hold, fade, and auto-regenerate lifecycle</span><span class="chip">Three-pass glow stroke: blurred additive outer glow + mid halo + crisp core, all SKBlendMode.Plus</span><span class="chip">Drifting SKShader sweep gradient through a per-figure randomized HSL palette (rotated each frame)</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/Skia2048/thumb.png" alt="Skia2048">
+        <span class="rank">13</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>Skia2048</h3>
+        <p class="one">A juicy, animated 2048 sliding-tile puzzle in pure SkiaSharp - slide, merge, and chase 2048 with particle bursts and glow.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Slide all tiles in one direction; equal tiles that collide merge into their sum (once per move) and add to your score, with a new 2/4 tile appearing after every move that changes the board. Reach the 2048 tile to win (keep going for a higher score); you lose when the board is full with no merges left.</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Arrow keys or WASD to slide tiles (mouse swipe also works); R to restart; Space/Enter to restart after game-over or to keep playing after a win. A Fluent Restart button sits bottom-right.</p>
+        <div class="chips"><span class="chip">Fixed-timestep slide animation with ease-out-cubic interpolation between cells</span><span class="chip">Merge/spawn pop using ease-out-back scaling</span><span class="chip">Particle bursts on merge with gravity and additive (SKBlendMode.Plus) blending</span><span class="chip">Per-tile glow via SKMaskFilter.CreateBlur for high values</span><span class="chip">Linear + radial SKShader gradients for tile depth and board vignette</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SkiaSnake/thumb.png" alt="SkiaSnake">
+        <span class="rank">14</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>SkiaSnake</h3>
+        <p class="one">Neon Snake in pure SkiaSharp: glide a glowing, gradient-bodied serpent around a fixed-timestep grid, gobble pulsing food, and don&#x27;t bite the walls or yourself.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Steer the snake to eat the glowing pink/orange food: each pellet is +10 score, grows the snake, and slightly speeds it up. Hitting a wall or your own body ends the run with a flash; restart to beat your best.</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Arrow keys or WASD to steer (no instant reverse). Space / Enter / R to restart after game over. Click the surface or the Restart button also restarts; clicking refocuses for keyboard.</p>
+        <div class="chips"><span class="chip">Fixed-timestep accumulator for frame-rate-independent grid ticks</span><span class="chip">Grid logic with no-instant-reverse turn buffering (pendingDir vs committed dir)</span><span class="chip">Linear + radial SKShader gradients (snake body tail-&gt;head, food, vignette)</span><span class="chip">Glow via SKMaskFilter.CreateBlur + SKBlendMode.Plus (neon border, food halo, trail underlay)</span><span class="chip">Procedural particle burst system (cell-space, converted to pixels at draw for resize safety)</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/LifeBloom/thumb.png" alt="LifeBloom">
+        <span class="rank">15</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>LifeBloom</h3>
+        <p class="one">Conway&#x27;s Game of Life reborn as a living garden: cells bloom from magenta youth into teal maturity and leave glowing, fading petals where they die.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Drag the pointer on the board to paint living cells (toggle the Erase button to wipe them); mouse wheel nudges the step rate. Fluent overlay (bottom-center): Pause/Play, Step (single generation), Randomize, Clear, an Erase toggle, and a Speed slider (0.5-30 steps/sec).</p>
+        <div class="chips"><span class="chip">Conway&#x27;s Game of Life cellular automaton on a toroidal (wrapping) grid</span><span class="chip">Color-by-age hue gradient (fresh magenta -&gt; mature teal via exponential aging curve)</span><span class="chip">Fading colored death trails with per-frame exponential decay, tinted by hue-at-death</span><span class="chip">Additive (SKBlendMode.Plus) glow halos with SKMaskFilter.CreateBlur, pulsing on fresh births</span><span class="chip">Batched rounded-rect cell rendering with reused SKPaint per layer</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/AuroraClock/thumb.png" alt="AuroraClock">
+        <span class="rank">16</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>AuroraClock</h3>
+        <p class="one">An elegant living analog clock floating over drifting aurora curtains, with glowing ticks, a silky sub-second sweeping hand, and a sparkle burst at the top of every new second.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>No controls needed — the clock runs autonomously off DateTime.Now at 60fps. Moving the mouse over the canvas adds a subtle parallax aurora glow that follows the cursor (pressing intensifies it); pointer events are already wired through MainPage to the canvas.</p>
+        <div class="chips"><span class="chip">SKSL runtime shader for the layered, drifting aurora backdrop (fbm value-noise curtains + twinkling stars)</span><span class="chip">Canvas transforms (Save/Translate/RotateDegrees) for all hands and tick marks</span><span class="chip">SKShader gradients: radial halo/vignette/glassy disc, sweep-gradient aurora rim, linear fallback</span><span class="chip">Soft glow via SKMaskFilter.CreateBlur on hands, ticks, sparkles and digital readout</span><span class="chip">Additive light with SKBlendMode.Plus for glows, sparkles and the second-hand tip pip</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SkiaPong/thumb.png" alt="SkiaPong">
+        <span class="rank">17</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>SkiaPong</h3>
+        <p class="one">Retro-neon Pong with glowing paddles, particle bursts, and a beatable AI — first to 7 wins.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Bounce the glowing ball past your opponent&#x27;s paddle to score; the contact point on the paddle sets the rebound angle and the ball speeds up every rally. First side to 7 points wins.</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Mouse Y or W/S move the left paddle (P1); Up/Down take over the right paddle for a 2nd human (else AI); Click or Space serves; Space/Enter or click restarts after game over; R resets the match anytime.</p>
+        <div class="chips"><span class="chip">AABB paddle/wall collision with contact-point angle reflection</span><span class="chip">Capped-speed tracking AI with sine jitter (beatable, drifts to center when idle)</span><span class="chip">Additive (SKBlendMode.Plus) + SKMaskFilter blur glow for paddles, ball, and score</span><span class="chip">Particle system (sparks on hits, 60-particle bursts on scoring) with gravity and fade</span><span class="chip">Radial-gradient background with animated scanline grid</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/GravityWells/thumb.png" alt="GravityWells">
+        <span class="rank">18</span><span class="tag demo">demo</span></div>
+      <div class="body">
+        <h3>GravityWells</h3>
+        <p class="one">Drop planets and watch a glowing solar system self-assemble under live Newtonian N-body gravity, with comet-like trails and collisions that merge in a flash.</p>
+        
+        <p class="ctrl"><b>Controls&nbsp;</b>Click-drag on the canvas to fling a planet (drag length/direction sets launch velocity, with a dashed aim arrow + speed readout); mouse wheel up adds 2 orbiters / wheel down removes the last body; &quot;Add random&quot; Fluent button seeds 6 near-circular orbiters; &quot;Reset&quot; clears the system and reseeds the starfield.</p>
+        <div class="chips"><span class="chip">Semi-implicit (symplectic) Euler integration with fixed sub-steps</span><span class="chip">Full N-body gravity (bodies attract the sun AND each other) with softening to avoid singularities</span><span class="chip">Momentum- and center-of-mass-conserving collision merging with expanding flash rings</span><span class="chip">Fading additive-glow orbit trails (SKBlendMode.Plus, per-segment alpha/width falloff)</span><span class="chip">Radial-gradient planet spheres with offset highlight + specular dot + additive halo</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumbwrap"><img loading="lazy" src="demos/SkiaAsteroids/thumb.png" alt="SkiaAsteroids">
+        <span class="rank">19</span><span class="tag game">game</span></div>
+      <div class="body">
+        <h3>SkiaAsteroids</h3>
+        <p class="one">Classic vector Asteroids reborn in SkiaSharp: a glowing triangular ship blasting drifting rocks into ever-smaller, screen-wrapping fragments.</p>
+        <p class="goal"><b>Goal&nbsp;</b>Fly the ship and shoot asteroids: big ones split into mediums then smalls (20/50/100 pts), clear all rocks to advance waves. You have 3 lives with a brief blinking invulnerability on respawn; lose them all and it&#x27;s game over, then restart.</p>
+        <p class="ctrl"><b>Controls&nbsp;</b>Left/Right (or A/D) rotate, Up (or W) thrust, Space (or X/Z) fire. Restart with R/Space/Enter or the on-screen Restart button. Mouse click on the canvas grabs keyboard focus (and restarts when game over).</p>
+        <div class="chips"><span class="chip">2D vector math (rotation, thrust acceleration, drag, max-speed clamp)</span><span class="chip">Canvas transforms (Save/Translate/RotateRadians) for the ship</span><span class="chip">Screen wrapping with seamless edge-straddle re-draw for ship/bullets/asteroids</span><span class="chip">Procedural jagged asteroid polygons via per-vertex radial offsets</span><span class="chip">Particle systems (thrust flame, muzzle flash, explosion bursts)</span></div>
+      </div>
+    </article></div>
+  <footer>
+    Single demo: <code>./run.ps1 &lt;Name&gt;</code> or <code>dotnet run -c Release --project demos/&lt;Name&gt;/&lt;Name&gt;/&lt;Name&gt;.csproj</code>.
+    WebAssembly gallery: <code>SkiaGallery/</code>. Built for the SkiaSharp 4 event &middot; platform.uno/skiasharp.
+  </footer>
+</body></html>

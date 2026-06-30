@@ -1,0 +1,38 @@
+using System;
+using System.IO;
+using SkiaSharp;
+
+namespace __NS__;
+
+// Headless representative-frame renderer:  __NS__.exe --thumb out.png
+// Renders one lively, mid-game frame of GameScene to a PNG (no window).
+// Also a smoke test: if Draw()/Update() throws, this fails loudly.
+internal static class Thumb
+{
+    public static void Render(string path)
+    {
+        const int w = 1100, h = 700;
+
+        var scene = new GameScene();
+        // Seed some input + advance so the frame is representative (not an empty board).
+        // Agents: adjust the synthesized keys/clicks so the thumbnail shows the game mid-play.
+        scene.PointerMove(w * 0.5f, h * 0.6f);
+        scene.KeyDown("Right");
+        for (int i = 0; i < 240; i++) scene.Update(1f / 60f);
+        scene.KeyUp("Right");
+
+        using var bmp = new SKBitmap(w, h);
+        using (var canvas = new SKCanvas(bmp))
+        {
+            scene.Draw(canvas, w, h);
+        }
+
+        var full = Path.GetFullPath(path);
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        using var img = SKImage.FromBitmap(bmp);
+        using var data = img.Encode(SKEncodedImageFormat.Png, 95);
+        using var fs = File.Create(full);
+        data.SaveTo(fs);
+        Console.WriteLine("thumb-written:" + full);
+    }
+}
