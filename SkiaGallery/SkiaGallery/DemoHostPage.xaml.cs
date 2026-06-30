@@ -16,7 +16,12 @@ public sealed partial class DemoHostPage : Page
     public DemoHostPage()
     {
         this.InitializeComponent();
-        _hudTimer.Tick += (_, _) => { _hudTimer.Stop(); Hud.Opacity = 0; };
+        _hudTimer.Tick += (_, _) =>
+        {
+            _hudTimer.Stop();
+            Hud.Opacity = 0;
+            Hud.IsHitTestVisible = false; // faded -> let clicks reach the canvas, no accidental Back
+        };
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -46,6 +51,7 @@ public sealed partial class DemoHostPage : Page
     private void ShowHud()
     {
         Hud.Opacity = 1;
+        Hud.IsHitTestVisible = true;
         _hudTimer.Stop();
         _hudTimer.Start();
     }
@@ -63,11 +69,28 @@ public sealed partial class DemoHostPage : Page
         });
     }
 
-    // Keep keyboard focus on the surface until we navigate away (UnoDoom-style).
-    // The Back button is mouse/touch-driven, so re-grabbing keyboard focus doesn't block it.
+    // Keep keyboard focus on the surface until we navigate away (UnoDoom-style), BUT only
+    // re-grab when focus was lost to nothing. If focus moved to a real control (the Back
+    // button), leave it - otherwise we'd steal focus mid-click and the button wouldn't fire.
     private void OnLostFocus(object sender, RoutedEventArgs e)
     {
-        if (_active)
+        if (!_active)
+        {
+            return;
+        }
+
+        object? focused = null;
+        try
+        {
+            focused = XamlRoot is not null ? FocusManager.GetFocusedElement(XamlRoot) : FocusManager.GetFocusedElement();
+        }
+        catch
+        {
+            // ignore; treat as unknown focus
+        }
+
+        // Only reclaim focus if it drifted to nothing (e.g. an unfocusable click target).
+        if (focused is null)
         {
             GrabFocus();
         }
