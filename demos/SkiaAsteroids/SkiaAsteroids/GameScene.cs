@@ -18,7 +18,7 @@ internal sealed class GameScene
     private readonly Random _rng = new();
 
     private float _w = 1100, _h = 700;
-    private bool _sized;
+    private float _lastW, _lastH;   // last size we laid out for; 0 until a valid frame arrives
 
     // Ship
     private float _shipX, _shipY;
@@ -545,16 +545,76 @@ internal sealed class GameScene
         StartNewGame();
     }
 
+    // Reflow all size-dependent state to the current canvas. Positions are stored in
+    // absolute pixels, so on a size change we scale them proportionally; this keeps the
+    // ship, asteroids, bullets and particles on-screen for any size/aspect ratio.
+    // Stars are stored normalized (0..1) and need no rescale. Wrap/spawn bounds read
+    // _w/_h live, so they follow automatically.
+    private void ApplyLayout(float width, float height)
+    {
+        if (width == _lastW && height == _lastH)
+        {
+            return;
+        }
+
+        // Scale from the size we previously laid out for (_w/_h) to the new one. On the
+        // first valid frame _w/_h are still the ctor defaults, so the new game's content
+        // is reflowed onto the real canvas exactly like any later resize.
+        float sx = width / _w;
+        float sy = height / _h;
+
+        _w = width;
+        _h = height;
+        _lastW = width;
+        _lastH = height;
+
+        RescalePositions(sx, sy);
+    }
+
+    private void RescalePositions(float sx, float sy)
+    {
+        if (sx == 1f && sy == 1f)
+        {
+            return;
+        }
+
+        _shipX *= sx;
+        _shipY *= sy;
+
+        for (int i = 0; i < _asteroids.Count; i++)
+        {
+            _asteroids[i].X *= sx;
+            _asteroids[i].Y *= sy;
+        }
+
+        for (int i = 0; i < _bullets.Count; i++)
+        {
+            Bullet b = _bullets[i];
+            b.X *= sx;
+            b.Y *= sy;
+            _bullets[i] = b;
+        }
+
+        for (int i = 0; i < _particles.Count; i++)
+        {
+            Particle p = _particles[i];
+            p.X *= sx;
+            p.Y *= sy;
+            _particles[i] = p;
+        }
+    }
+
     // ---- Rendering ----
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        if (width > 0 && height > 0)
+        // Guard against degenerate/transient sizes (e.g. a near-zero first frame
+        // before layout settles) so they can't poison the cached playfield.
+        if (width <= 1f || height <= 1f)
         {
-            _w = width;
-            _h = height;
-            _sized = true;
+            return;
         }
-        _ = _sized;
+
+        ApplyLayout(width, height);
 
         canvas.Clear(new SKColor(0x05, 0x07, 0x10));
 

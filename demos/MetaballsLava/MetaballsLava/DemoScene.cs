@@ -193,8 +193,22 @@ internal sealed class DemoScene
         }
     }
 
-    // pointer coords arrive in pixels; we store normalized and convert on draw.
-    private float _lastW = 1, _lastH = 1;
+    // Pointer coords arrive in pixels; we store normalized and convert using the
+    // last VALID canvas size. Seeded with a sane fallback so pointer/spawn events that
+    // fire before the first real Draw (e.g. the headless thumbnail) still map on-screen.
+    // These are refreshed every Draw and never set from a degenerate/transient size,
+    // so a near-zero first frame can't pin the pixel->normalized mapping to the corner.
+    private float _lastW = 1000, _lastH = 1000;
+    private bool _haveValidSize;
+
+    // Raw pointer pixels (normalized in Draw against the current size); active flag
+    // marks whether the pointer is on the canvas. Pending spawns hold clicks that
+    // arrive before the first valid frame so they land correctly once size is known.
+    private float _pxPixels, _pyPixels;
+    private bool _pointerActive;
+    private readonly float[] _pendingSpawnsX = new float[MaxBlobs];
+    private readonly float[] _pendingSpawnsY = new float[MaxBlobs];
+    private int _pendingSpawnCount;
 
     public void PointerDown(float x, float y)
     {
@@ -208,17 +222,35 @@ internal sealed class DemoScene
     public void PointerUp(float x, float y)
     {
         _down = false;
+        _pointerActive = false;
         _px = -1; _py = -1;
     }
 
     private void SetPointer(float x, float y)
     {
-        _px = x / _lastW;
-        _py = y / _lastH;
+        // Keep raw pixels; the actual normalization happens in Draw against the
+        // current valid size so the pointer tracks correctly across resizes (and
+        // works even if input arrives before the first valid frame).
+        _pxPixels = x;
+        _pyPixels = y;
+        _pointerActive = true;
     }
 
     private void SpawnBlobAt(float xPx, float yPx)
     {
+        // If no valid size yet (e.g. input before the first real Draw), queue the
+        // pixel position and resolve it on the first valid frame.
+        if (!_haveValidSize)
+        {
+            if (_pendingSpawnCount < _pendingSpawnsX.Length)
+            {
+                _pendingSpawnsX[_pendingSpawnCount] = xPx;
+                _pendingSpawnsY[_pendingSpawnCount] = yPx;
+                _pendingSpawnCount++;
+            }
+            return;
+        }
+
         int idx = -1;
         for (int i = 0; i < MaxBlobs; i++)
         {
@@ -250,14 +282,41 @@ internal sealed class DemoScene
         _viscosity = 1f;
         _px = -1; _py = -1;
         _down = false;
+        _pointerActive = false;
+        _pendingSpawnCount = 0;
         Array.Clear(_blobs);
         SeedBlobs();
     }
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        _lastW = width <= 0 ? 1 : width;
-        _lastH = height <= 0 ? 1 : height;
+        // Skip transient/degenerate frames so a near-zero first size can't poison the
+        // pixel->normalized mapping used by pointer input and blob spawning.
+        if (width <= 1 || height <= 1) { return; }
+
+        bool firstValidFrame = !_haveValidSize;
+
+        // Record the last valid size; pointer/spawn math reads these.
+        _lastW = width;
+        _lastH = height;
+        _haveValidSize = true;
+
+        // Flush any spawns that arrived before we knew a real size (e.g. headless thumb).
+        if (firstValidFrame && _pendingSpawnCount > 0)
+        {
+            for (int i = 0; i < _pendingSpawnCount; i++)
+            {
+                SpawnBlobAt(_pendingSpawnsX[i], _pendingSpawnsY[i]);
+            }
+            _pendingSpawnCount = 0;
+        }
+
+        // Resolve the live pointer against the current size (tracks resizes correctly).
+        if (_pointerActive)
+        {
+            _px = _pxPixels / width;
+            _py = _pyPixels / height;
+        }
 
         if (_effect is null)
         {

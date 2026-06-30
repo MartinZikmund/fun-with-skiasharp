@@ -33,7 +33,8 @@ internal sealed class DemoScene : IDemoScene
     private float _time;
     private float _width = 1100, _height = 700;
     private float _sunX, _sunY;
-    private bool _sunPlaced;
+    private bool _layoutValid;            // becomes true once a non-degenerate size is seen
+    private float _layoutWidth, _layoutHeight; // size the current layout was computed for
 
     // pointer / drag state
     private bool _dragging;
@@ -104,7 +105,7 @@ internal sealed class DemoScene : IDemoScene
 
     public void PointerDown(float x, float y)
     {
-        EnsureSun();
+        EnsureLayout();
         _dragging = true;
         _dragStartX = x; _dragStartY = y;
         _dragCurX = x; _dragCurY = y;
@@ -151,16 +152,17 @@ internal sealed class DemoScene : IDemoScene
     {
         _bodies.Clear();
         _flashes.Clear();
-        _sunPlaced = false;
         _dragging = false;
         _time = 0;
+        // Re-center the sun on the current canvas (keeps layout reflowing on resize).
+        EnsureLayout();
         SeedStars();
     }
 
     // Called from a UI button: seed N nicely orbiting bodies.
     public void AddRandom(int count)
     {
-        EnsureSun();
+        EnsureLayout();
         for (int i = 0; i < count; i++)
         {
             SpawnOrbiter();
@@ -284,19 +286,68 @@ internal sealed class DemoScene : IDemoScene
 
     // ---- spawning ------------------------------------------------------------
 
-    private void EnsureSun()
+    // Recompute size-dependent layout when the canvas size changes (or on the
+    // first valid frame after a transient one). The sun stays centered on the
+    // current canvas and the whole system (bodies, trails, flashes) is shifted
+    // proportionally so content reflows with the canvas instead of drifting off
+    // when the size changes.
+    private void EnsureLayout()
     {
-        if (!_sunPlaced)
+        // Guard against degenerate / transient sizes so a 0-size first frame
+        // can't poison the cached layout.
+        if (_width <= 1f || _height <= 1f)
         {
-            _sunX = _width / 2f;
-            _sunY = _height / 2f;
-            _sunPlaced = true;
+            return;
         }
+
+        if (_layoutValid && _width == _layoutWidth && _height == _layoutHeight)
+        {
+            return;
+        }
+
+        float newSunX = _width / 2f;
+        float newSunY = _height / 2f;
+
+        if (_layoutValid)
+        {
+            // Scale + translate existing content from the old playfield to the
+            // new one so the system tracks the canvas on resize.
+            float sx = _width / _layoutWidth;
+            float sy = _height / _layoutHeight;
+            // uniform scale keeps orbits circular; translate keeps sun-relative offsets
+            float s = MathF.Min(sx, sy);
+            foreach (var b in _bodies)
+            {
+                b.X = newSunX + (b.X - _sunX) * s;
+                b.Y = newSunY + (b.Y - _sunY) * s;
+                b.Vx *= s;
+                b.Vy *= s;
+                for (int k = 0; k < b.TrailCount; k++)
+                {
+                    b.Tx[k] = newSunX + (b.Tx[k] - _sunX) * s;
+                    b.Ty[k] = newSunY + (b.Ty[k] - _sunY) * s;
+                }
+            }
+            for (int i = 0; i < _flashes.Count; i++)
+            {
+                var f = _flashes[i];
+                f.X = newSunX + (f.X - _sunX) * s;
+                f.Y = newSunY + (f.Y - _sunY) * s;
+                f.Radius *= s;
+                _flashes[i] = f;
+            }
+        }
+
+        _sunX = newSunX;
+        _sunY = newSunY;
+        _layoutWidth = _width;
+        _layoutHeight = _height;
+        _layoutValid = true;
     }
 
     private void SpawnBody(float x, float y, float vx, float vy, float mass)
     {
-        EnsureSun();
+        EnsureLayout();
         var (core, edge) = RandomPalette();
         _bodies.Add(new Body
         {
@@ -314,7 +365,7 @@ internal sealed class DemoScene : IDemoScene
 
     private void SpawnOrbiter()
     {
-        EnsureSun();
+        EnsureLayout();
         // Place at a random radius and give it a near-circular orbital velocity.
         float ang = (float)(_rng.NextDouble() * Math.PI * 2);
         float minR = MathF.Min(_width, _height) * 0.14f;
@@ -384,9 +435,16 @@ internal sealed class DemoScene : IDemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Skip degenerate / transient sizes so a 0-size first frame can't poison
+        // cached layout (we keep the last valid size in _width/_height).
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         _width = width;
         _height = height;
-        EnsureSun();
+        EnsureLayout();
 
         DrawBackground(canvas, width, height);
         DrawStars(canvas, width, height);

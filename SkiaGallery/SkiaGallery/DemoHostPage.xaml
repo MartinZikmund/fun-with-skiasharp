@@ -4,22 +4,26 @@
       xmlns:core="using:SkiaGallery.Core"
       Background="#06070D">
 
-  <Grid x:Name="Root" Background="Transparent" IsTabStop="True"
+  <Grid x:Name="Root" Background="Transparent" IsTabStop="True" UseSystemFocusVisuals="False"
         Loaded="OnLoaded"
+        LostFocus="OnLostFocus"
         KeyDown="OnKeyDown" KeyUp="OnKeyUp"
         PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved"
         PointerReleased="OnPointerReleased" PointerWheelChanged="OnPointerWheel">
 
     <core:GalleryCanvas x:Name="Canvas" />
 
-    <Border VerticalAlignment="Top" HorizontalAlignment="Stretch"
-            Background="#B3000000" Padding="14,9">
-      <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-        <Button Content="&#8592; Back" Click="OnBack" />
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock x:Name="TitleText" Foreground="#EEF1FB" FontWeight="SemiBold" FontSize="15" />
-          <TextBlock x:Name="ControlsText" Foreground="#9AA3C0" FontSize="12" TextWrapping="NoWrap" />
-        </StackPanel>
+    <!-- Compact auto-hiding overlay (Back + demo name). Fades out during play so it
+         never covers the sample's own title/HUD; reappears on pointer movement. -->
+    <Border x:Name="Hud" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+            Background="#B3000000" CornerRadius="10" Padding="8,5">
+      <Border.OpacityTransition>
+        <ScalarTransition Duration="0:0:0.35" />
+      </Border.OpacityTransition>
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Button Content="&#8592; Back" Click="OnBack" Padding="10,4" />
+        <TextBlock x:Name="TitleText" Foreground="#EEF1FB" FontWeight="SemiBold"
+                   FontSize="14" VerticalAlignment="Center" />
       </StackPanel>
     </Border>
   </Grid>

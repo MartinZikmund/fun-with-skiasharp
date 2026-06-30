@@ -28,6 +28,12 @@ internal sealed class DemoScene : IDemoScene
     private bool _down;
     private float _glow;                 // eased pointer-glow intensity
 
+    // Last-seen canvas size + size-dependent layout. Recomputed whenever the
+    // size changes (including the first valid frame after a transient one) so
+    // the dial always re-centers/re-scales and never sticks to a stale size.
+    private float _lastW = -1, _lastH = -1;
+    private float _cx, _cy, _radius;
+
     // Optional time override so the headless thumbnail shows a pleasing time.
     private DateTime? _forcedNow;
 
@@ -75,6 +81,7 @@ internal sealed class DemoScene : IDemoScene
         _glow = 0;
         _px = _py = -1;
         _down = false;
+        _lastW = _lastH = -1;   // force layout recompute on next draw
     }
 
     // Headless thumbnail uses this to lock in a flattering time.
@@ -82,9 +89,28 @@ internal sealed class DemoScene : IDemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against degenerate/transient sizes (e.g. a near-zero first frame
+        // before layout settles). Skip drawing so we never compute a zero radius,
+        // divide by zero in the aurora shader, or poison cached layout.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
+        // Recompute size-dependent layout whenever the canvas size changes
+        // (including the first valid frame after a transient one).
+        if (width != _lastW || height != _lastH)
+        {
+            _lastW = width;
+            _lastH = height;
+            _cx = width / 2f;
+            _cy = height / 2f;
+            _radius = MathF.Min(width, height) * 0.40f;
+        }
+
         DateTime now = _forcedNow ?? DateTime.Now;
-        float cx = width / 2f, cy = height / 2f;
-        float radius = MathF.Min(width, height) * 0.40f;
+        float cx = _cx, cy = _cy;
+        float radius = _radius;
 
         DrawAurora(canvas, width, height);
         DrawVignette(canvas, width, height, cx, cy);

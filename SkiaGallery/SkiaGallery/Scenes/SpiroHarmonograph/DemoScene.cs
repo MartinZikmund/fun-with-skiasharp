@@ -198,8 +198,17 @@ internal sealed class DemoScene : IDemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against degenerate/transient sizes (e.g. a 0-size first frame
+        // before layout settles): skip drawing so nothing gets pinned to a bad size.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         DrawBackground(canvas, width, height);
 
+        // Anchor + scale recomputed from the CURRENT size every frame, so the
+        // figure stays centered and fills any aspect ratio when the canvas resizes.
         float cx = width / 2f, cy = height / 2f;
         float scale = MathF.Min(width, height) * 0.36f;
 
@@ -399,7 +408,7 @@ internal sealed class DemoScene : IDemoScene
         float prog = _count > 0 ? Math.Clamp(_reveal / _count, 0f, 1f) : 0f;
         float barY = height - 22f;
         float barX = 28f;
-        float barW = width - 56f;
+        float barW = MathF.Max(0f, width - 56f);
         using var track = new SKPaint { Color = new SKColor(255, 255, 255, 28), IsAntialias = true };
         canvas.DrawRoundRect(barX, barY, barW, 4f, 2f, 2f, track);
         using var fill = new SKPaint

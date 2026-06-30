@@ -37,7 +37,8 @@ internal sealed class GameScene : IDemoScene
 
     private Phase _phase = Phase.Ready;
     private float _w = 1100, _h = 700;
-    private bool _sized;
+    // Last size we actually laid out for. -1 = no valid (non-degenerate) frame yet.
+    private float _layoutW = -1f, _layoutH = -1f;
 
     private float _birdX;
     private float _birdY;
@@ -315,6 +316,11 @@ internal sealed class GameScene : IDemoScene
 
     private static bool CircleRect(float cx, float cy, float r, float rx, float ry, float rw, float rh)
     {
+        // A collapsed rect (can happen on extreme resizes) never collides.
+        if (rw <= 0f || rh <= 0f)
+        {
+            return false;
+        }
         float nx = Math.Clamp(cx, rx, rx + rw);
         float ny = Math.Clamp(cy, ry, ry + rh);
         float dx = cx - nx;
@@ -333,15 +339,22 @@ internal sealed class GameScene : IDemoScene
         }
     }
 
-    private float RandomGapCenter()
+    // Valid range for a pipe gap center at the given canvas height.
+    private static (float top, float bottom) GapRange(float h)
     {
         float playTop = PipeGap * 0.5f + 60f;
-        float playBottom = _h - GroundHeight - PipeGap * 0.5f - 40f;
+        float playBottom = h - GroundHeight - PipeGap * 0.5f - 40f;
         if (playBottom < playTop)
         {
             playBottom = playTop + 1f;
         }
-        return playTop + (float)_rng.NextDouble() * (playBottom - playTop);
+        return (playTop, playBottom);
+    }
+
+    private float RandomGapCenter()
+    {
+        (float top, float bottom) = GapRange(_h);
+        return top + (float)_rng.NextDouble() * (bottom - top);
     }
 
     private void SpawnScorePop(float x, float y)
@@ -410,8 +423,8 @@ internal sealed class GameScene : IDemoScene
         {
             _clouds.Add(new Cloud
             {
-                X = (float)_rng.NextDouble() * Math.Max(_w, 1100f),
-                Y = 40f + (float)_rng.NextDouble() * (Math.Max(_h, 700f) * 0.45f),
+                X = (float)_rng.NextDouble() * _w,
+                Y = 40f + (float)_rng.NextDouble() * (_h * 0.45f),
                 Scale = 0.6f + (float)_rng.NextDouble() * 0.9f,
                 Speed = 12f + (float)_rng.NextDouble() * 22f,
             });
@@ -429,8 +442,72 @@ internal sealed class GameScene : IDemoScene
         _shake = 0f;
         _pipes.Clear();
         _particles.Clear();
-        _birdX = Math.Max(_w, 1100f) * 0.28f;
-        _birdY = Math.Max(_h, 700f) * 0.45f;
+        // Use the current canvas if we've already laid out for one; otherwise defaults.
+        float w = _layoutW > 0f ? _w : Math.Max(_w, 1100f);
+        float h = _layoutH > 0f ? _h : Math.Max(_h, 700f);
+        _birdX = w * 0.28f;
+        _birdY = h * 0.45f;
+        EnsurePipes();
+    }
+
+    // Recompute all size-dependent layout when the canvas size changes (including the
+    // first valid frame after a transient/degenerate one). Content is reflowed
+    // proportionally so it stays centered/filled at any size or aspect ratio.
+    private void ApplyLayout(float width, float height)
+    {
+        bool first = _layoutW < 0f;
+        bool changed = first
+            || Math.Abs(width - _layoutW) > 0.5f
+            || Math.Abs(height - _layoutH) > 0.5f;
+
+        if (!changed)
+        {
+            _w = width;
+            _h = height;
+            return;
+        }
+
+        float oldH = _layoutH > 0f ? _layoutH : height;
+
+        _w = width;
+        _h = height;
+        _layoutW = width;
+        _layoutH = height;
+
+        if (first)
+        {
+            // First real frame: place the bird at its canonical anchor.
+            _birdX = _w * 0.28f;
+            _birdY = _h * 0.45f;
+        }
+        else
+        {
+            // Reflow on resize: keep the bird's horizontal anchor proportional and
+            // shift live pipes by the same delta so relative gameplay is preserved.
+            float newBirdX = _w * 0.28f;
+            float dx = newBirdX - _birdX;
+            _birdX = newBirdX;
+
+            // Remap each pipe's gap center from the old playfield range into the new
+            // one so gaps stay reachable and rects never collapse on the new height.
+            (float oldTop, float oldBottom) = GapRange(oldH);
+            (float newTop, float newBottom) = GapRange(_h);
+            float oldSpan = Math.Max(1f, oldBottom - oldTop);
+            foreach (Pipe p in _pipes)
+            {
+                p.X += dx;
+                float frac = Math.Clamp((p.GapCenter - oldTop) / oldSpan, 0f, 1f);
+                p.GapCenter = newTop + frac * (newBottom - newTop);
+            }
+
+            // Scale the bird's vertical position to the new height so it never ends
+            // up off-screen or buried in the ground after a resize.
+            float yFrac = oldH > 0f ? _birdY / oldH : 0.45f;
+            _birdY = Math.Clamp(yFrac, 0.05f, 0.95f) * _h;
+        }
+
+        // Field bounds changed: re-seed clouds for the new canvas and top up pipes.
+        SeedClouds();
         EnsurePipes();
     }
 
@@ -438,20 +515,13 @@ internal sealed class GameScene : IDemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        bool resized = Math.Abs(width - _w) > 0.5f || Math.Abs(height - _h) > 0.5f;
-        _w = width;
-        _h = height;
-        if (!_sized)
+        // Ignore degenerate/transient sizes so a 0-size first frame can't poison layout.
+        if (width <= 1f || height <= 1f)
         {
-            _sized = true;
-            _birdX = _w * 0.28f;
-            _birdY = _h * 0.45f;
-            EnsurePipes();
+            return;
         }
-        else if (resized)
-        {
-            EnsurePipes();
-        }
+
+        ApplyLayout(width, height);
 
         canvas.Save();
         if (_shake > 0f)

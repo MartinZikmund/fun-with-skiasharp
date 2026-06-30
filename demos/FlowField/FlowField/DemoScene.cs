@@ -24,7 +24,7 @@ internal sealed class DemoScene
 
     private readonly Random _rng = new(1234);
     private float _time;
-    private float _w = 1100, _h = 700;
+    private float _w, _h;       // current field bounds; 0 until a valid size is seen
     private bool _seeded;
 
     // ---- pointer interaction ----
@@ -48,7 +48,12 @@ internal sealed class DemoScene
         float target = _ptrDown ? 1f : (_ptrX >= 0 ? 0.35f : 0f);
         _ptrInfluence += (target - _ptrInfluence) * MathF.Min(1f, dt * 6f);
 
-        EnsureSeeded();
+        // Don't advance the field until Draw() has reported a valid size and seeded it;
+        // seeding against an unknown/degenerate size would pin particles to a corner.
+        if (!_seeded || _w <= 1f || _h <= 1f)
+        {
+            return;
+        }
 
         float t = _time;
         float swirl = _swirlSign * _swirlBoost;
@@ -166,7 +171,7 @@ internal sealed class DemoScene
 
     private void EnsureSeeded()
     {
-        if (_seeded)
+        if (_seeded || _w <= 1f || _h <= 1f)
         {
             return;
         }
@@ -175,6 +180,27 @@ internal sealed class DemoScene
             Respawn(i, initial: true);
         }
         _seeded = true;
+    }
+
+    // Reflow on resize: map every particle proportionally into the new bounds so the
+    // field keeps filling the whole canvas at any aspect ratio.
+    private void RescaleField(float newW, float newH)
+    {
+        float sx = newW / _w;
+        float sy = newH / _h;
+        for (int i = 0; i < ParticleCount; i++)
+        {
+            _x[i] *= sx;
+            _y[i] *= sy;
+            _px[i] *= sx;
+            _py[i] *= sy;
+        }
+        // Keep the vortex anchored relative to the canvas after resize.
+        if (_ptrX >= 0)
+        {
+            _ptrX *= sx;
+            _ptrY *= sy;
+        }
     }
 
     private void Respawn(int i, bool initial = false)
@@ -191,14 +217,29 @@ internal sealed class DemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        // Resize: keep particles in bounds when the window changes size.
-        if (MathF.Abs(width - _w) > 0.5f || MathF.Abs(height - _h) > 0.5f)
+        // Guard transient/degenerate sizes (e.g. a 0-size first frame before layout
+        // settles). Skip entirely so cached layout can't be poisoned by a tiny box.
+        if (width <= 1f || height <= 1f)
         {
-            _w = MathF.Max(1f, width);
-            _h = MathF.Max(1f, height);
+            return;
         }
 
-        EnsureSeeded();
+        // First valid frame seeds the field; later size changes rescale it so the
+        // particles always FILL the current canvas instead of clinging to old bounds.
+        bool sizeChanged = MathF.Abs(width - _w) > 0.5f || MathF.Abs(height - _h) > 0.5f;
+        if (!_seeded)
+        {
+            _w = width;
+            _h = height;
+            EnsureSeeded();
+        }
+        else if (sizeChanged)
+        {
+            RescaleField(width, height);
+            _w = width;
+            _h = height;
+            _paintedOnce = false; // repaint the backdrop at the new size
+        }
 
         // For the very first frame (e.g. thumbnail start) paint an opaque vignette base
         // so trails accumulate against a dark backdrop. After that we only fade.

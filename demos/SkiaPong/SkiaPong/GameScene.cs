@@ -122,6 +122,51 @@ internal sealed class GameScene
         _serveTimer = 0.6f;
     }
 
+    // Reflow all size-dependent state to the current canvas. Called every frame from Draw;
+    // only does work when the size actually changes (incl. the first valid frame after a
+    // transient one), so gameplay positions scale/centre instead of sticking to frame one.
+    private void ApplySize(float width, float height)
+    {
+        if (width == _w && height == _h && _haveSize)
+        {
+            return;
+        }
+
+        if (!_haveSize)
+        {
+            // First real size: centre paddles and ball.
+            _haveSize = true;
+            _w = width;
+            _h = height;
+            _leftY = height * 0.5f;
+            _rightY = height * 0.5f;
+            CenterBall();
+            return;
+        }
+
+        // Subsequent resize: rescale positions proportionally so content reflows
+        // (stays on-screen and keeps its relative place) rather than pinning to old pixels.
+        float sx = width / _w;
+        float sy = height / _h;
+
+        _leftY *= sy;
+        _rightY *= sy;
+        _ballX *= sx;
+        _ballY *= sy;
+
+        if (_mouseY >= 0f)
+        {
+            _mouseY *= sy;
+        }
+
+        _w = width;
+        _h = height;
+
+        // Keep paddles within the new playfield.
+        _leftY = Clamp(_leftY, PaddleH * 0.5f, _h - PaddleH * 0.5f);
+        _rightY = Clamp(_rightY, PaddleH * 0.5f, _h - PaddleH * 0.5f);
+    }
+
     private void Serve()
     {
         if (_phase == Phase.GameOver)
@@ -403,21 +448,13 @@ internal sealed class GameScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        if (width > 0f && height > 0f)
+        // Ignore degenerate/transient sizes so a near-zero first frame can't poison layout.
+        if (width <= 1f || height <= 1f)
         {
-            // First real size: re-centre paddles so the opening frame looks right.
-            if (!_haveSize)
-            {
-                _haveSize = true;
-                _leftY = height * 0.5f;
-                _rightY = height * 0.5f;
-                _w = width;
-                _h = height;
-                CenterBall();
-            }
-            _w = width;
-            _h = height;
+            return;
         }
+
+        ApplySize(width, height);
 
         canvas.Save();
 

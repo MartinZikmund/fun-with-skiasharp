@@ -33,6 +33,11 @@ internal sealed class DemoScene : IDemoScene
     // Wheel-controlled zoom into the nebula (clamped).
     private float _zoom = 1f;
 
+    // Last canvas size we laid out for. When it changes, the pixel-space
+    // interaction state (swirl/pulse/pointer) is rescaled so it stays at the
+    // same RELATIVE spot and never gets pinned to a stale size after a resize.
+    private float _lastW, _lastH;
+
     // Cached compiled effect (compile once, not per frame).
     private SKRuntimeEffect? _effect;
     private string? _compileError;
@@ -84,13 +89,41 @@ internal sealed class DemoScene : IDemoScene
         _zoom = 1f;
         _swirlInit = false;
         _pulseStart = -100f;
+        _lastW = 0;
+        _lastH = 0;
+    }
+
+    // Rescale all pixel-space interaction state so a resize keeps the swirl,
+    // pulse and pointer at the same relative position instead of stranding them
+    // off-screen (e.g. an old 1100px X used on a 520px-wide canvas).
+    private void ReflowToSize(float width, float height)
+    {
+        if (_lastW > 1 && _lastH > 1)
+        {
+            float kx = width / _lastW;
+            float ky = height / _lastH;
+            if (_px >= 0) { _px *= kx; _py *= ky; }
+            if (_swirlInit) { _swirlX *= kx; _swirlY *= ky; }
+            _pulseX *= kx; _pulseY *= ky;
+        }
+        _lastW = width;
+        _lastH = height;
     }
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        if (width <= 0 || height <= 0)
+        // Skip degenerate/transient sizes so a near-zero first frame can't
+        // poison the cached layout we reflow from.
+        if (width <= 1 || height <= 1)
         {
             return;
+        }
+
+        // Recompute size-dependent state whenever the canvas size changes
+        // (including the first valid frame after a transient one).
+        if (width != _lastW || height != _lastH)
+        {
+            ReflowToSize(width, height);
         }
 
         EnsureEffect();

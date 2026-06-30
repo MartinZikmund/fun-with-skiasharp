@@ -14,6 +14,12 @@ internal sealed class DemoScene
     // --- timing & dimensions ---
     private float _time;
     private float _w = 1100, _h = 700;
+    // Last size we computed layout from; -1 forces a recompute on the first valid frame.
+    private float _lastW = -1, _lastH = -1;
+    // True while _w/_h hold a usable (non-degenerate) size, so Update can spawn safely.
+    // Seeded true because the ctor defaults are a valid size; a transient 0-size Draw
+    // is rejected before it can overwrite them, so this stays trustworthy.
+    private bool _sized = true;
     private float _launchTimer = 0.6f;
 
     // --- input / charging ---
@@ -59,8 +65,10 @@ internal sealed class DemoScene
         _time += dt;
 
         // Auto-launch celebratory shells even with no input.
+        // Only spawn once Draw has reported a real size, so a transient 0-size
+        // first frame can't drive launches into a degenerate playfield.
         _launchTimer -= dt;
-        if (_launchTimer <= 0f)
+        if (_sized && _launchTimer <= 0f)
         {
             float x = _w * (0.15f + (float)_rng.NextDouble() * 0.7f);
             float targetY = _h * (0.18f + (float)_rng.NextDouble() * 0.32f);
@@ -151,7 +159,9 @@ internal sealed class DemoScene
 
     private void LaunchRocket(float targetX, float targetY, BurstSize size)
     {
-        targetX = Math.Clamp(targetX, 20f, _w - 20f);
+        // Margins relative to size, but never inverted on tiny canvases.
+        float marginX = MathF.Min(20f, _w * 0.25f);
+        targetX = Math.Clamp(targetX, marginX, MathF.Max(marginX, _w - marginX));
         targetY = Math.Clamp(targetY, _h * 0.08f, _h * 0.7f);
 
         float startX = targetX + (float)(_rng.NextDouble() - 0.5) * _w * 0.06f;
@@ -322,8 +332,23 @@ internal sealed class DemoScene
     // ---------------- drawing ----------------
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard transient/degenerate first frames so they can't poison cached layout.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         _w = width;
         _h = height;
+
+        // Recompute size-dependent layout whenever the canvas size changes
+        // (including the first valid frame after a transient one).
+        if (width != _lastW || height != _lastH)
+        {
+            OnResize(width, height);
+            _lastW = width;
+            _lastH = height;
+        }
 
         DrawSkyAndAurora(canvas, width, height);
         DrawStars(canvas, width, height);
@@ -331,6 +356,14 @@ internal sealed class DemoScene
         DrawRockets(canvas);
         DrawChargeIndicator(canvas);
         DrawTitle(canvas, width, height);
+    }
+
+    // Recompute size-dependent layout on a real size change. Stars are stored in
+    // normalized [0,1] space and the aurora/title are derived from w/h every frame,
+    // so they reflow automatically; this just marks the scene as ready to spawn.
+    private void OnResize(float width, float height)
+    {
+        _sized = true;
     }
 
     private void DrawSkyAndAurora(SKCanvas canvas, float w, float h)
@@ -447,48 +480,48 @@ internal sealed class DemoScene
             switch (s.Kind)
             {
                 case SparkKind.Flash:
-                {
-                    byte a = (byte)(lifeFrac * 230);
-                    using var shader = SKShader.CreateRadialGradient(
-                        new SKPoint(s.X, s.Y), s.Size,
-                        new[] { s.Color.WithAlpha(a), s.Color.WithAlpha(0) },
-                        null, SKShaderTileMode.Clamp);
-                    _glowPaint.Shader = shader;
-                    canvas.DrawCircle(s.X, s.Y, s.Size, _glowPaint);
-                    _glowPaint.Shader = null;
-                    break;
-                }
-                case SparkKind.Trail:
-                {
-                    byte a = (byte)(lifeFrac * 200);
-                    _sparkPaint.Shader = null;
-                    _sparkPaint.Color = s.Color.WithAlpha(a);
-                    canvas.DrawCircle(s.X, s.Y, s.Size * (0.5f + lifeFrac), _sparkPaint);
-                    break;
-                }
-                default:
-                {
-                    // Soft glow halo + bright core for burst/crackle sparks.
-                    float fade = lifeFrac * lifeFrac; // ease-out
-                    byte glowA = (byte)(fade * 90);
-                    float glowR = s.Size * 3.2f;
-                    using (var shader = SKShader.CreateRadialGradient(
-                        new SKPoint(s.X, s.Y), glowR,
-                        new[] { s.Color.WithAlpha(glowA), s.Color.WithAlpha(0) },
-                        null, SKShaderTileMode.Clamp))
                     {
+                        byte a = (byte)(lifeFrac * 230);
+                        using var shader = SKShader.CreateRadialGradient(
+                            new SKPoint(s.X, s.Y), s.Size,
+                            new[] { s.Color.WithAlpha(a), s.Color.WithAlpha(0) },
+                            null, SKShaderTileMode.Clamp);
                         _glowPaint.Shader = shader;
-                        canvas.DrawCircle(s.X, s.Y, glowR, _glowPaint);
+                        canvas.DrawCircle(s.X, s.Y, s.Size, _glowPaint);
                         _glowPaint.Shader = null;
+                        break;
                     }
+                case SparkKind.Trail:
+                    {
+                        byte a = (byte)(lifeFrac * 200);
+                        _sparkPaint.Shader = null;
+                        _sparkPaint.Color = s.Color.WithAlpha(a);
+                        canvas.DrawCircle(s.X, s.Y, s.Size * (0.5f + lifeFrac), _sparkPaint);
+                        break;
+                    }
+                default:
+                    {
+                        // Soft glow halo + bright core for burst/crackle sparks.
+                        float fade = lifeFrac * lifeFrac; // ease-out
+                        byte glowA = (byte)(fade * 90);
+                        float glowR = s.Size * 3.2f;
+                        using (var shader = SKShader.CreateRadialGradient(
+                            new SKPoint(s.X, s.Y), glowR,
+                            new[] { s.Color.WithAlpha(glowA), s.Color.WithAlpha(0) },
+                            null, SKShaderTileMode.Clamp))
+                        {
+                            _glowPaint.Shader = shader;
+                            canvas.DrawCircle(s.X, s.Y, glowR, _glowPaint);
+                            _glowPaint.Shader = null;
+                        }
 
-                    byte coreA = (byte)(fade * 255);
-                    SKColor core = s.Twinkle > 0.5f ? SKColors.White : s.Color;
-                    _sparkPaint.Shader = null;
-                    _sparkPaint.Color = core.WithAlpha(coreA);
-                    canvas.DrawCircle(s.X, s.Y, s.Size * (0.5f + fade * 0.7f), _sparkPaint);
-                    break;
-                }
+                        byte coreA = (byte)(fade * 255);
+                        SKColor core = s.Twinkle > 0.5f ? SKColors.White : s.Color;
+                        _sparkPaint.Shader = null;
+                        _sparkPaint.Color = core.WithAlpha(coreA);
+                        canvas.DrawCircle(s.X, s.Y, s.Size * (0.5f + fade * 0.7f), _sparkPaint);
+                        break;
+                    }
             }
         }
     }

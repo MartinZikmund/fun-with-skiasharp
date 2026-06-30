@@ -38,6 +38,12 @@ internal sealed class GameScene
     private float _eatPulse;        // grows on eat, decays
     private bool _started;          // becomes true once a turn key is pressed
 
+    // --- size-dependent layout (recomputed whenever the canvas size changes) ---
+    private float _lastW = -1f, _lastH = -1f;
+    private float _cell, _boardW, _boardH, _ox, _oy;  // board geometry in pixels
+    private float _padTop, _pad, _hudScale;           // scaled chrome metrics
+    private bool _layoutValid;
+
     public GameScene() => Reset();
 
     // Exposed for the headless thumbnail driver (Thumb.cs) so it can steer toward food.
@@ -301,34 +307,57 @@ internal sealed class GameScene
     {
         canvas.Clear(new SKColor(0x07, 0x0A, 0x14));
 
-        // Compute a centered, square-ish board with padding.
-        float padTop = 64f;
-        float pad = 24f;
-        float availW = width - pad * 2f;
-        float availH = height - padTop - pad;
-        if (availW < 10f || availH < 10f)
+        // Skip transient/degenerate frames so a near-zero first frame can't poison layout.
+        if (width <= 1f || height <= 1f)
         {
             return;
         }
 
-        float cell = Math.Min(availW / Cols, availH / Rows);
-        float boardW = cell * Cols;
-        float boardH = cell * Rows;
-        float ox = (width - boardW) / 2f;
-        float oy = padTop + (availH - boardH) / 2f;
+        // Recompute the size-dependent board geometry whenever the canvas size changes
+        // (including the first valid frame after a transient one).
+        if (!_layoutValid || width != _lastW || height != _lastH)
+        {
+            RecomputeLayout(width, height);
+        }
 
         DrawBackground(canvas, width, height);
-        DrawBoard(canvas, ox, oy, boardW, boardH, cell);
-        DrawFood(canvas, ox, oy, cell);
-        DrawSnake(canvas, ox, oy, cell);
-        DrawParticles(canvas, ox, oy, cell);
-        DrawHud(canvas, width, height, ox, oy, boardW, boardH);
+        DrawBoard(canvas, _ox, _oy, _boardW, _boardH, _cell);
+        DrawFood(canvas, _ox, _oy, _cell);
+        DrawSnake(canvas, _ox, _oy, _cell);
+        DrawParticles(canvas, _ox, _oy, _cell);
+        DrawHud(canvas, width, height, _ox, _oy, _boardW, _boardH);
 
         if (_flash > 0f)
         {
             using var flash = new SKPaint { Color = new SKColor(0xFF, 0x3B, 0x6B, (byte)(120 * _flash)) };
             canvas.DrawRect(0, 0, width, height, flash);
         }
+    }
+
+    // Scale the playfield + chrome to the current canvas and center it (letterboxed),
+    // so the board fills sensibly at any aspect ratio or size instead of vanishing or
+    // pinning to a corner.
+    private void RecomputeLayout(float width, float height)
+    {
+        _lastW = width;
+        _lastH = height;
+
+        // HUD chrome scales with the smaller dimension but stays within sane caps so
+        // it never eats the whole board on tiny canvases nor balloons on huge ones.
+        float refDim = Math.Min(width, height);
+        _hudScale = Math.Clamp(refDim / 700f, 0.4f, 1.6f);
+        _padTop = Math.Clamp(height * 0.09f, 12f, 64f);   // room for title/score row
+        _pad = Math.Clamp(refDim * 0.03f, 6f, 24f);       // outer margin
+
+        float availW = Math.Max(1f, width - _pad * 2f);
+        float availH = Math.Max(1f, height - _padTop - _pad);
+
+        _cell = Math.Min(availW / Cols, availH / Rows);
+        _boardW = _cell * Cols;
+        _boardH = _cell * Rows;
+        _ox = (width - _boardW) / 2f;
+        _oy = _padTop + (availH - _boardH) / 2f;
+        _layoutValid = true;
     }
 
     private void DrawBackground(SKCanvas canvas, float width, float height)
@@ -551,32 +580,36 @@ internal sealed class GameScene
 
     private void DrawHud(SKCanvas canvas, float width, float height, float ox, float oy, float boardW, float boardH)
     {
-        // Title + score row.
-        using var titleFont = new SKFont(SKTypeface.FromFamilyName("Consolas", SKFontStyle.Bold) ?? SKTypeface.Default, 30);
-        using var scoreFont = new SKFont(SKTypeface.FromFamilyName("Consolas", SKFontStyle.Bold) ?? SKTypeface.Default, 26);
-        using var hintFont = new SKFont(SKTypeface.Default, 16);
+        // Fonts + margins scale with the canvas so the chrome fits any size.
+        float s = _hudScale;
+        float marginX = Math.Clamp(width * 0.025f, 6f, 28f);
+        float baseline = Math.Min(_padTop * 0.66f, _padTop - 4f);
+
+        using var titleFont = new SKFont(SKTypeface.FromFamilyName("Consolas", SKFontStyle.Bold) ?? SKTypeface.Default, 30 * s);
+        using var scoreFont = new SKFont(SKTypeface.FromFamilyName("Consolas", SKFontStyle.Bold) ?? SKTypeface.Default, 26 * s);
+        using var hintFont = new SKFont(SKTypeface.Default, 16 * s);
 
         using var neon = new SKPaint { Color = new SKColor(0x6B, 0xFF, 0x8E), IsAntialias = true };
         using var neonGlow = new SKPaint
         {
             Color = new SKColor(0x6B, 0xFF, 0x8E, 150),
             IsAntialias = true,
-            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6f),
+            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 6f * s),
         };
-        canvas.DrawText("SKIA  SNAKE", 28, 42, SKTextAlign.Left, titleFont, neonGlow);
-        canvas.DrawText("SKIA  SNAKE", 28, 42, SKTextAlign.Left, titleFont, neon);
+        canvas.DrawText("SKIA  SNAKE", marginX, baseline, SKTextAlign.Left, titleFont, neonGlow);
+        canvas.DrawText("SKIA  SNAKE", marginX, baseline, SKTextAlign.Left, titleFont, neon);
 
         using var white = new SKPaint { Color = SKColors.White, IsAntialias = true };
         using var pink = new SKPaint { Color = new SKColor(0xFF, 0x6F, 0xA8), IsAntialias = true };
-        canvas.DrawText($"SCORE {_score}", width - 28, 40, SKTextAlign.Right, scoreFont, pink);
-        canvas.DrawText($"BEST {_best}", width - 28, 64, SKTextAlign.Right, hintFont, white);
+        canvas.DrawText($"SCORE {_score}", width - marginX, baseline - 2 * s, SKTextAlign.Right, scoreFont, pink);
+        canvas.DrawText($"BEST {_best}", width - marginX, baseline + 22 * s, SKTextAlign.Right, hintFont, white);
 
         // Bottom hint.
         using var hintCol = new SKPaint { Color = new SKColor(0x9A, 0xB0, 0xD0), IsAntialias = true };
         string hint = _started
             ? "Arrows / WASD to steer   -   eat the pink food   -   don't bite yourself"
             : "Press an arrow or WASD to start   -   eat the pink food to grow";
-        canvas.DrawText(hint, width / 2f, height - 16, SKTextAlign.Center, hintFont, hintCol);
+        canvas.DrawText(hint, width / 2f, height - 16 * s, SKTextAlign.Center, hintFont, hintCol);
 
         if (_phase == Phase.Dead)
         {
@@ -590,8 +623,11 @@ internal sealed class GameScene
         canvas.DrawRect(ox - 6, oy - 6, boardW + 12, boardH + 12, dim);
 
         float pulse = 0.5f + 0.5f * (float)Math.Sin(_time * 4f);
-        using var bigFont = new SKFont(SKTypeface.FromFamilyName("Consolas", SKFontStyle.Bold) ?? SKTypeface.Default, 56);
-        using var midFont = new SKFont(SKTypeface.Default, 24);
+        // Scale the overlay to the board so "GAME OVER" fits inside any size.
+        float bigSize = Math.Clamp(boardW * 0.11f, 18f, 56f);
+        float midSize = Math.Clamp(boardW * 0.05f, 11f, 24f);
+        using var bigFont = new SKFont(SKTypeface.FromFamilyName("Consolas", SKFontStyle.Bold) ?? SKTypeface.Default, bigSize);
+        using var midFont = new SKFont(SKTypeface.Default, midSize);
 
         float cx = ox + boardW / 2f;
         float cy = oy + boardH / 2f;
@@ -607,9 +643,9 @@ internal sealed class GameScene
         canvas.DrawText("GAME OVER", cx, cy - 6, SKTextAlign.Center, bigFont, red);
 
         using var white = new SKPaint { Color = SKColors.White, IsAntialias = true };
-        canvas.DrawText($"Score {_score}   -   Best {_best}", cx, cy + 34, SKTextAlign.Center, midFont, white);
+        canvas.DrawText($"Score {_score}   -   Best {_best}", cx, cy + bigSize * 0.7f, SKTextAlign.Center, midFont, white);
 
         using var cta = new SKPaint { Color = new SKColor(0x6B, 0xFF, 0x8E).WithAlpha((byte)(180 + 75 * pulse)), IsAntialias = true };
-        canvas.DrawText("Press SPACE / ENTER to play again", cx, cy + 70, SKTextAlign.Center, midFont, cta);
+        canvas.DrawText("Press SPACE / ENTER to play again", cx, cy + bigSize * 0.7f + midSize * 1.5f, SKTextAlign.Center, midFont, cta);
     }
 }

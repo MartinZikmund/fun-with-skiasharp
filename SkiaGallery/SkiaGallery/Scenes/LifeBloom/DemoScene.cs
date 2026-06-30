@@ -267,6 +267,14 @@ internal sealed class DemoScene : IDemoScene
     // --- Drawing ------------------------------------------------------------
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against transient/degenerate sizes (e.g. a near-zero first frame
+        // before layout settles). Skipping keeps cached layout (_cell/_ox/_oy)
+        // from being poisoned; the next valid frame recomputes everything below.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         // Deep nebula backdrop.
         using (var bg = new SKPaint
         {

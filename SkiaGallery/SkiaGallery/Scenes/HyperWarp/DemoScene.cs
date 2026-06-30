@@ -37,6 +37,7 @@ internal sealed class DemoScene : IDemoScene
 
     private float _time;
     private float _w = 1, _h = 1;
+    private float _lastW = -1, _lastH = -1; // last size we laid out for; -1 = none yet
 
     // Steering: vanishing point as a fraction offset from center (-0.5..0.5).
     private float _steerX, _steerY;          // smoothed (what we render)
@@ -161,16 +162,46 @@ internal sealed class DemoScene : IDemoScene
         _jumpTimer = 4.5f;
         _boosting = false;
         _pointerInside = false;
+        _lastW = _lastH = -1; // force layout reflow on the next valid Draw
         for (int i = 0; i < _stars.Length; i++)
         {
             _stars[i] = NewStar(_rng.NextSingle() * MaxDepth);
         }
     }
 
+    // Recompute all size-dependent state when the canvas size changes (or on the
+    // first valid frame after a transient one). Star positions live in normalized
+    // camera space, so the only size-dependent cached state is each star's previous
+    // projected screen position (pixel space) - stale after a resize, so invalidate
+    // it to avoid one frame of garbage streaks smeared across the old->new geometry.
+    private void OnSizeChanged()
+    {
+        for (int i = 0; i < _stars.Length; i++)
+        {
+            _stars[i].HasPrev = false;
+        }
+    }
+
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against degenerate/transient sizes (e.g. a near-zero first frame
+        // before layout settles); don't lay out or draw from them.
+        if (width <= 1 || height <= 1)
+        {
+            return;
+        }
+
         _w = width;
         _h = height;
+
+        // Detect a size change (including the first valid frame) and reflow.
+        if (width != _lastW || height != _lastH)
+        {
+            _lastW = width;
+            _lastH = height;
+            OnSizeChanged();
+        }
+
         float cx = width * (0.5f + _steerX * 0.55f);  // vanishing point follows steer
         float cy = height * (0.5f + _steerY * 0.55f);
         float diag = MathF.Sqrt(width * width + height * height);

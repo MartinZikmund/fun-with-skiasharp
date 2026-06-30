@@ -28,6 +28,9 @@ internal sealed class GameScene
 
     private sealed class Particle
     {
+        // Position/velocity are stored in BOARD-LOCAL units (0..1 across the board)
+        // so bursts spawned before/independent of a valid layout still resolve to the
+        // right on-board spot and survive canvas resizes. Resolved to pixels at draw time.
         public float X, Y, Vx, Vy, Life, MaxLife, Size;
         public SKColor Color;
     }
@@ -53,6 +56,10 @@ internal sealed class GameScene
 
     // Layout cached from last Draw (so pointer/swipe maps correctly).
     private float _w, _h;
+
+    // Last-seen size used to detect resizes and recompute layout. -1 = never laid out yet.
+    private float _lastW = -1f, _lastH = -1f;
+    private bool _layoutValid;
 
     public GameScene()
     {
@@ -465,34 +472,38 @@ internal sealed class GameScene
             }
             p.X += p.Vx * dt;
             p.Y += p.Vy * dt;
-            p.Vy += 420f * dt; // gravity
+            p.Vy += 1.05f * dt; // gravity (board-fractions / s^2)
             p.Vx *= 0.98f;
         }
     }
 
-    // Particle bursts are spawned in grid coordinates and resolved to pixels at draw time
-    // is awkward; instead we store pixel positions using the last known layout.
+    // Bursts are spawned in BOARD-LOCAL space (fraction of the board, 0..1) so they do not
+    // depend on a cached pixel layout that may be stale, missing (a move before the first
+    // valid Draw), or about to change on resize. Resolved to pixels in DrawParticles.
     private void SpawnMergeBurst(int r, int c, int value)
     {
-        var (gx, gy, cell, gap) = LayoutCached();
-        float cx = gx + gap + c * (cell + gap) + cell / 2f;
-        float cy = gy + gap + r * (cell + gap) + cell / 2f;
+        // Cell + gap as a fraction of the whole board (board = cell*Size + gap*(Size+1)).
+        float gapF = 0.022f / (1f + 0.022f * (Size + 1));
+        float cellF = (1f - gapF * (Size + 1)) / Size;
+        float cx = gapF + c * (cellF + gapF) + cellF / 2f;
+        float cy = gapF + r * (cellF + gapF) + cellF / 2f;
         SKColor col = TileColor(value);
 
         int count = 14 + Math.Min(20, (int)(Math.Log2(value) * 2));
         for (int i = 0; i < count; i++)
         {
             double ang = _rng.NextDouble() * Math.PI * 2;
-            float spd = 60f + (float)_rng.NextDouble() * 220f;
+            // Speed in board-fractions/second (~0.15..0.7 of the board width per second).
+            float spd = 0.15f + (float)_rng.NextDouble() * 0.55f;
             _particles.Add(new Particle
             {
                 X = cx,
                 Y = cy,
                 Vx = (float)Math.Cos(ang) * spd,
-                Vy = (float)Math.Sin(ang) * spd - 60f,
+                Vy = (float)Math.Sin(ang) * spd - 0.15f,
                 Life = 0.4f + (float)_rng.NextDouble() * 0.5f,
                 MaxLife = 0.9f,
-                Size = 3f + (float)_rng.NextDouble() * 5f,
+                Size = 0.008f + (float)_rng.NextDouble() * 0.013f, // fraction of board
                 Color = col,
             });
         }
@@ -507,10 +518,14 @@ internal sealed class GameScene
 
     private void ComputeLayout(float w, float h)
     {
-        float topReserve = 150f;   // room for title + scoreboard
-        float bottomReserve = 56f; // controls hint
-        float avail = Math.Min(w - 40f, h - topReserve - bottomReserve);
-        avail = Math.Max(avail, 120f);
+        // Reserve room for the header (title + scoreboard) and the controls hint, but scale
+        // those reserves down on small/short canvases so the board still fits and centers.
+        float topReserve = Math.Min(150f, h * 0.22f);
+        float bottomReserve = Math.Min(56f, h * 0.08f);
+        float sideMargin = Math.Min(40f, w * 0.08f);
+
+        float avail = Math.Min(w - sideMargin * 2f, h - topReserve - bottomReserve);
+        avail = Math.Max(avail, 1f);
 
         float board = avail;
         float gap = board * 0.022f;
@@ -518,17 +533,34 @@ internal sealed class GameScene
 
         _lGap = gap;
         _lCell = cell;
+        // Center horizontally, and center vertically within the play area below the header.
         _lGx = (w - board) / 2f;
         _lGy = topReserve + ((h - topReserve - bottomReserve) - board) / 2f;
+        _layoutValid = true;
     }
 
     // ---- Draw --------------------------------------------------------------
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard transient/degenerate sizes (e.g. a near-zero first frame before layout
+        // settles) so they can't poison the cached layout or render off-screen.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         _w = width;
         _h = height;
-        ComputeLayout(width, height);
+
+        // Recompute size-dependent layout whenever the canvas size changes (including the
+        // first valid frame after a transient one). Cheap, so this also covers resizes.
+        if (!_layoutValid || width != _lastW || height != _lastH)
+        {
+            ComputeLayout(width, height);
+            _lastW = width;
+            _lastH = height;
+        }
 
         DrawBackground(canvas, width, height);
 
@@ -749,12 +781,18 @@ internal sealed class GameScene
             return;
         }
 
+        // Resolve board-local particle coordinates to pixels using the current layout.
+        var (gx, gy, cell, gap) = LayoutCached();
+        float board = cell * Size + gap * (Size + 1);
+
         using var paint = new SKPaint { IsAntialias = true, BlendMode = SKBlendMode.Plus };
         foreach (var p in _particles)
         {
             float a = Math.Clamp(p.Life / p.MaxLife, 0f, 1f);
             paint.Color = p.Color.WithAlpha((byte)(220 * a));
-            canvas.DrawCircle(p.X, p.Y, p.Size * (0.4f + 0.6f * a), paint);
+            float px = gx + p.X * board;
+            float py = gy + p.Y * board;
+            canvas.DrawCircle(px, py, p.Size * board * (0.4f + 0.6f * a), paint);
         }
     }
 

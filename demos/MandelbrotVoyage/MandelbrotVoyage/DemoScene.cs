@@ -156,9 +156,19 @@ internal sealed class DemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        canvas.Clear(SKColors.Black);
+
+        // Guard against degenerate/transient sizes (e.g. a near-zero first frame before
+        // layout settles). Dividing by a ~0 resolution in the shader yields NaNs, so we
+        // skip drawing AND skip caching the bad size. The view fills the canvas fresh from
+        // width/height every valid frame, so it reflows automatically on resize.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         _width = width;
         _height = height;
-        canvas.Clear(SKColors.Black);
 
         if (_effect is null)
         {

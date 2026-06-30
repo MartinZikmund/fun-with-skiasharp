@@ -13,13 +13,15 @@ namespace KaleidoPaint;
 // Uno-free (SkiaSharp + System only) so the same code renders headless thumbnails.
 internal sealed class DemoScene
 {
-    // A single painted stroke: a polyline stored in CENTER-RELATIVE coordinates
-    // (origin = mandala center) so it survives resize and rotates about the center.
+    // A single painted stroke: a polyline stored in NORMALIZED center-relative
+    // coordinates (origin = mandala center, 1 unit = the reference dimension
+    // min(w,h)). Normalizing makes strokes survive resize AND rescale to fill the
+    // current canvas, rotating about the center.
     private sealed class Stroke
     {
         public readonly List<SKPoint> Points = new();
         public float Hue;          // base hue at paint time
-        public float Width;        // brush radius in pixels
+        public float Width;        // brush radius as a fraction of the reference dimension
         public float Born;         // _time when stroke started
     }
 
@@ -29,6 +31,9 @@ internal sealed class DemoScene
     private float _time;
     private float _w = 1, _h = 1;
     private float _cx, _cy;
+    // Reference dimension = min(w,h). Strokes are stored as fractions of this, so
+    // they rescale to fill/center the canvas at any size or aspect ratio.
+    private float _refDim = 1f;
     private bool _down;
 
     // Last raw pointer (for the live cursor hint).
@@ -69,6 +74,7 @@ internal sealed class DemoScene
         _h = MathF.Max(height, 1f);
         _cx = _w / 2f;
         _cy = _h / 2f;
+        _refDim = MathF.Max(MathF.Min(_w, _h), 1f);
     }
 
     public void PointerDown(float x, float y)
@@ -78,7 +84,9 @@ internal sealed class DemoScene
         _active = new Stroke
         {
             Hue = (_time * 36f) % 360f,
-            Width = 6.5f,
+            // Brush radius stored as a fraction of the reference dimension so it
+            // scales with the canvas (6.5px at the 700px-tall reference frame).
+            Width = 6.5f / 700f,
             Born = _time,
         };
         _active.Points.Add(Rel(x, y));
@@ -103,7 +111,9 @@ internal sealed class DemoScene
 
         SKPoint last = _active.Points[^1];
         float dx = p.X - last.X, dy = p.Y - last.Y;
-        if (dx * dx + dy * dy >= 9f) // ~3px in center-relative space
+        // ~3px of movement, expressed in normalized space (1 unit = _refDim).
+        float minStep = 3f / _refDim;
+        if (dx * dx + dy * dy >= minStep * minStep)
         {
             _active.Points.Add(p);
         }
@@ -134,13 +144,23 @@ internal sealed class DemoScene
         _active = null;
     }
 
-    // Pixel -> center-relative.
-    private SKPoint Rel(float x, float y) => new(x - _cx, y - _cy);
+    // Pixel -> normalized center-relative (origin = center, 1 unit = _refDim).
+    private SKPoint Rel(float x, float y) => new((x - _cx) / _refDim, (y - _cy) / _refDim);
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against degenerate/transient sizes (e.g. a near-zero first frame)
+        // so layout is never initialized from a size that would poison it.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
+        // Recompute all size-dependent layout from the CURRENT size every frame so
+        // the mandala reflows on resize (center + reference dimension for scaling).
         _w = width; _h = height;
         _cx = width / 2f; _cy = height / 2f;
+        _refDim = MathF.Max(MathF.Min(width, height), 1f);
 
         DrawBackground(canvas, width, height);
 
@@ -150,6 +170,9 @@ internal sealed class DemoScene
 
         canvas.Save();
         canvas.Translate(_cx, _cy);
+        // Scale normalized (center-relative) space up to pixels so the whole mandala
+        // fills/centers on the current canvas regardless of size or aspect ratio.
+        canvas.Scale(_refDim);
 
         // Gentle global drift so the finished mandala feels alive.
         float drift = _time * 6f;
@@ -239,10 +262,11 @@ internal sealed class DemoScene
         IReadOnlyList<SKPoint> pts = stroke.Points;
         if (pts.Count == 1)
         {
-            // A dot: tiny closed loop so round-cap stroke renders a glowing point.
+            // A dot: tiny nub so the round-cap stroke renders a glowing point.
+            // Nudge is in normalized units, kept sub-pixel relative to _refDim.
             SKPoint p = pts[0];
             _scratch.MoveTo(p.X, p.Y);
-            _scratch.LineTo(p.X + 0.01f, p.Y);
+            _scratch.LineTo(p.X + 0.0001f, p.Y);
             return;
         }
 
@@ -261,10 +285,11 @@ internal sealed class DemoScene
 
     private void DrawCore(SKCanvas canvas)
     {
+        // Normalized space: 1 unit = min(w,h), so radius is a fraction of it.
         float pulse = 0.6f + 0.4f * MathF.Sin(_time * 1.7f);
-        float r = MathF.Min(_w, _h) * 0.035f * pulse;
+        float r = MathF.Max(0.035f * pulse, 1f / _refDim);
         using SKShader sh = SKShader.CreateRadialGradient(
-            new SKPoint(0, 0), MathF.Max(r, 1f),
+            new SKPoint(0, 0), r,
             new[]
             {
                 SKColors.White.WithAlpha(220),
@@ -274,14 +299,15 @@ internal sealed class DemoScene
             new[] { 0f, 0.4f, 1f },
             SKShaderTileMode.Clamp);
         using SKPaint p = new() { Shader = sh, BlendMode = SKBlendMode.Plus, IsAntialias = true };
-        canvas.DrawCircle(0, 0, MathF.Max(r, 1f), p);
+        canvas.DrawCircle(0, 0, r, p);
     }
 
     // A pre-baked mandala so the very first frame (and the thumbnail without input)
     // looks gorgeous. Drawn once per sector inside the symmetry loop.
     private void DrawSeedSector(SKCanvas canvas)
     {
-        float radius = MathF.Min(_w, _h) * 0.42f;
+        // Normalized space: 1 unit = min(w,h).
+        float radius = 0.42f;
         int petals = 6;
         for (int k = 0; k < petals; k++)
         {
@@ -300,11 +326,11 @@ internal sealed class DemoScene
             float pulse = 0.7f + 0.3f * MathF.Sin(_time * 2f + k);
 
             _glowPaint.Color = SKColor.FromHsl(hue, 95, 58).WithAlpha((byte)(60 * pulse));
-            _glowPaint.StrokeWidth = 14f;
+            _glowPaint.StrokeWidth = 14f / 700f;
             canvas.DrawPath(_scratch, _glowPaint);
 
             _corePaint.Color = SKColor.FromHsl(hue, 100, 80).WithAlpha(170);
-            _corePaint.StrokeWidth = 4f;
+            _corePaint.StrokeWidth = 4f / 700f;
             canvas.DrawPath(_scratch, _corePaint);
         }
     }

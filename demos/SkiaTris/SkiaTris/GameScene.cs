@@ -562,18 +562,37 @@ internal sealed class GameScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against transient/degenerate sizes (e.g. a near-zero first
+        // frame before layout settles): never lay out from such a size.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         DrawBackground(canvas, width, height);
 
-        // Layout: centered well with side panel.
-        float margin = 24f;
+        // Layout is recomputed from the CURRENT width/height every frame, so the
+        // playfield always scales and re-centers when the canvas resizes.
+        float margin = MathF.Min(24f, MathF.Min(width, height) * 0.06f);
+
+        // Reserve room for the side panel only when the canvas is wide enough
+        // to fit it alongside a reasonably sized board; otherwise drop it and
+        // center the board across the full canvas (handles tall/narrow sizes).
         float panelW = MathF.Min(260f, width * 0.28f);
-        float availW = width - panelW - margin * 3;
+        bool showPanel = width - panelW - margin * 3 >= Cols * 8f && width > height * 0.6f;
+        if (!showPanel)
+        {
+            panelW = 0f;
+        }
+
+        float availW = width - panelW - margin * (showPanel ? 3 : 2);
         float availH = height - margin * 2;
         float cell = MathF.Min(availW / Cols, availH / Rows);
-        cell = MathF.Max(8f, cell);
+        cell = MathF.Max(4f, cell);
 
         float boardW = cell * Cols;
         float boardH = cell * Rows;
+        // Center the board within the available (canvas minus panel) area.
         float boardX = margin + MathF.Max(0, (availW - boardW) / 2f);
         float boardY = margin + MathF.Max(0, (availH - boardH) / 2f);
 
@@ -601,7 +620,10 @@ internal sealed class GameScene
 
         canvas.Restore();
 
-        DrawSidePanel(canvas, boardX + boardW + margin, boardY, panelW, boardH, cell);
+        if (showPanel)
+        {
+            DrawSidePanel(canvas, boardX + boardW + margin, boardY, panelW, boardH, cell);
+        }
 
         if (_gameOver)
         {

@@ -48,19 +48,26 @@ internal sealed class GameScene : IDemoScene
 
     private float _w = 1100, _h = 700;
     private bool _haveSize;
+    private float _lastLayoutW = -1f, _lastLayoutH = -1f;
 
-    // Paddle
+    // Centered/letterboxed playfield the whole game is laid out within, so it
+    // scales and stays on-screen for any canvas size or aspect ratio.
+    private float _fieldX, _fieldY, _fieldW, _fieldH;
+    private float _scale = 1f;       // playfield size relative to the design size
+
+    // Paddle (sizes scale with the playfield).
     private float _paddleX;          // center x
     private float _paddleW = 150f;
-    private const float PaddleH = 18f;
+    private float _paddleH = 18f;
     private float _paddleBottomGap = 46f;
-    private float PaddleY => _h - _paddleBottomGap;
+    private float PaddleY => _fieldY + _fieldH - _paddleBottomGap;
 
     // Ball
     private float _ballX, _ballY, _ballVx, _ballVy;
-    private const float BallR = 10f;
-    private float _baseSpeed = 520f;
+    private float _ballR = 10f;
+    private float _baseSpeed = 520f; // design-space px/s; scaled by the playfield
     private float _speedMul = 1f;     // creeps up over time
+    private float BallSpeed => _baseSpeed * _speedMul * _scale;
     private float _trail;             // for trail effect timing
 
     private readonly List<(float x, float y)> _ballTrail = new();
@@ -78,10 +85,71 @@ internal sealed class GameScene : IDemoScene
     private float _shake;            // screen-shake magnitude
     private float _flashWin;         // win/lose banner pulse
 
+    // Natural design aspect ratio; the playfield is letterboxed to this so the
+    // game scales and centers within any canvas instead of pinning to a corner.
+    private const float DesignW = 1100f;
+    private const float DesignH = 700f;
+
     public GameScene()
     {
+        Layout();
         ResetInternal(fullReset: true);
     }
+
+    // Recompute the centered/letterboxed playfield (and dependent layout) for the
+    // current canvas size. Called whenever the size changes. Bricks are rebuilt to
+    // fit the new field while preserving each brick's alive/hit state.
+    private void Layout()
+    {
+        bool firstLayout = _lastLayoutW <= 0f || _lastLayoutH <= 0f;
+
+        // Remember the old field so dynamic content can be re-mapped into the new one.
+        float oldX = _fieldX, oldY = _fieldY, oldW = _fieldW, oldH = _fieldH;
+
+        // Largest rect of the design aspect that fits centered in the canvas.
+        _scale = Math.Min(_w / DesignW, _h / DesignH);
+        _fieldW = DesignW * _scale;
+        _fieldH = DesignH * _scale;
+        _fieldX = (_w - _fieldW) * 0.5f;
+        _fieldY = (_h - _fieldH) * 0.5f;
+
+        _paddleW = 150f * _scale;
+        _paddleH = 18f * _scale;
+        _paddleBottomGap = 46f * _scale;
+        _ballR = 10f * _scale;
+
+        RebuildBrickLayout();
+
+        // Re-map paddle/ball/trail proportionally from the old field into the new one.
+        if (!firstLayout && oldW > 0f && oldH > 0f)
+        {
+            _paddleX = MapX(_paddleX, oldX, oldW);
+            _ballX = MapX(_ballX, oldX, oldW);
+            _ballY = MapY(_ballY, oldY, oldH);
+            for (int i = 0; i < _ballTrail.Count; i++)
+            {
+                _ballTrail[i] = (MapX(_ballTrail[i].x, oldX, oldW), MapY(_ballTrail[i].y, oldY, oldH));
+            }
+        }
+        else
+        {
+            _paddleX = _fieldX + _fieldW * 0.5f;
+        }
+
+        _paddleX = Clamp(_paddleX, _fieldX + _paddleW * 0.5f, _fieldX + _fieldW - _paddleW * 0.5f);
+
+        if (_state == State.Ready)
+        {
+            ResetBallOnPaddle();
+        }
+
+        _lastLayoutW = _w;
+        _lastLayoutH = _h;
+    }
+
+    private float MapX(float x, float oldX, float oldW) => _fieldX + (x - oldX) / oldW * _fieldW;
+
+    private float MapY(float y, float oldY, float oldH) => _fieldY + (y - oldY) / oldH * _fieldH;
 
     // Read-only hooks for the headless thumbnail renderer (keeps the paddle under the ball).
     internal float BallX => _ballX;
@@ -123,7 +191,7 @@ internal sealed class GameScene : IDemoScene
     {
         if (_haveSize)
         {
-            _paddleX = Clamp(x, _paddleW * 0.5f, _w - _paddleW * 0.5f);
+            _paddleX = Clamp(x, _fieldX + _paddleW * 0.5f, _fieldX + _fieldW - _paddleW * 0.5f);
         }
         else
         {
@@ -144,7 +212,7 @@ internal sealed class GameScene : IDemoScene
             _state = State.Playing;
             // Launch upward with a slight random angle.
             float angle = (float)(-Math.PI / 2 + (_rng.NextDouble() - 0.5) * 0.7);
-            float spd = _baseSpeed * _speedMul;
+            float spd = BallSpeed;
             _ballVx = (float)Math.Cos(angle) * spd;
             _ballVy = (float)Math.Sin(angle) * spd;
         }
@@ -178,25 +246,22 @@ internal sealed class GameScene : IDemoScene
     private void ResetBallOnPaddle()
     {
         _ballX = _paddleX;
-        _ballY = PaddleY - PaddleH * 0.5f - BallR - 2f;
+        _ballY = PaddleY - _paddleH * 0.5f - _ballR - 2f;
         _ballVx = 0f;
         _ballVy = 0f;
         _state = (_state == State.Won || _state == State.Lost) ? _state : State.Ready;
     }
 
+    // Grid dimensions of the current brick layout (so it can be repositioned on resize).
+    private int _gridCols;
+    private int _gridRows;
+
     private void BuildBricks()
     {
         _bricks.Clear();
 
-        int cols = 11;
-        int rows = 6 + Math.Min(_level - 1, 3); // more rows on later levels
-        float marginX = 60f;
-        float top = 90f;
-        float gap = 8f;
-
-        float usable = _w - marginX * 2f;
-        float bw = (usable - gap * (cols - 1)) / cols;
-        float bh = 28f;
+        _gridCols = 11;
+        _gridRows = 6 + Math.Min(_level - 1, 3); // more rows on later levels
 
         // Rainbow-ish palette per row.
         SKColor[] palette =
@@ -212,9 +277,9 @@ internal sealed class GameScene : IDemoScene
             new(0x6D, 0xFF, 0xE0),
         };
 
-        for (int r = 0; r < rows; r++)
+        for (int r = 0; r < _gridRows; r++)
         {
-            for (int c = 0; c < cols; c++)
+            for (int c = 0; c < _gridCols; c++)
             {
                 // Some bricks are tougher (2 hits) on higher rows / later levels.
                 int maxHits = 1;
@@ -227,17 +292,48 @@ internal sealed class GameScene : IDemoScene
                     maxHits = 2;
                 }
 
-                _bricks.Add(new Brick
+                Brick b = new()
                 {
-                    X = marginX + c * (bw + gap),
-                    Y = top + r * (bh + gap),
-                    W = bw,
-                    H = bh,
                     Color = palette[r % palette.Length],
                     Hits = maxHits,
                     MaxHits = maxHits,
-                });
+                };
+                PlaceBrick(b, r, c);
+                _bricks.Add(b);
             }
+        }
+    }
+
+    // Position an existing brick into the (scaled, centered) playfield grid cell.
+    private void PlaceBrick(Brick b, int row, int col)
+    {
+        float marginX = 60f * _scale;
+        float top = 90f * _scale;
+        float gap = 8f * _scale;
+        float bh = 28f * _scale;
+
+        float usable = _fieldW - marginX * 2f;
+        float bw = (usable - gap * (_gridCols - 1)) / _gridCols;
+
+        b.X = _fieldX + marginX + col * (bw + gap);
+        b.Y = _fieldY + top + row * (bh + gap);
+        b.W = bw;
+        b.H = bh;
+    }
+
+    // Reposition the current bricks for the current field (preserving alive/hit state).
+    private void RebuildBrickLayout()
+    {
+        if (_gridCols <= 0 || _gridRows <= 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < _bricks.Count; i++)
+        {
+            int row = i / _gridCols;
+            int col = i % _gridCols;
+            PlaceBrick(_bricks[i], row, col);
         }
     }
 
@@ -284,7 +380,7 @@ internal sealed class GameScene : IDemoScene
             if (_state == State.Ready)
             {
                 _ballX = _paddleX;
-                _ballY = PaddleY - PaddleH * 0.5f - BallR - 2f;
+                _ballY = PaddleY - _paddleH * 0.5f - _ballR - 2f;
             }
             return;
         }
@@ -299,7 +395,7 @@ internal sealed class GameScene : IDemoScene
 
     private void StepBall(float dt)
     {
-        float targetSpeed = _baseSpeed * _speedMul;
+        float targetSpeed = BallSpeed;
 
         // Normalize velocity to target speed so collisions don't slow/speed it.
         float spd = (float)Math.Sqrt(_ballVx * _ballVx + _ballVy * _ballVy);
@@ -312,7 +408,7 @@ internal sealed class GameScene : IDemoScene
 
         // Sub-step movement for robust collisions at high speed.
         float moveLen = targetSpeed * dt;
-        int steps = Math.Max(1, (int)Math.Ceiling(moveLen / (BallR * 0.75f)));
+        int steps = Math.Max(1, (int)Math.Ceiling(moveLen / (_ballR * 0.75f)));
         float sdt = dt / steps;
 
         for (int s = 0; s < steps; s++)
@@ -320,23 +416,27 @@ internal sealed class GameScene : IDemoScene
             _ballX += _ballVx * sdt;
             _ballY += _ballVy * sdt;
 
-            // Walls.
-            if (_ballX - BallR < 0f)
+            // Walls (relative to the centered playfield).
+            float left = _fieldX;
+            float right = _fieldX + _fieldW;
+            float topWall = _fieldY;
+
+            if (_ballX - _ballR < left)
             {
-                _ballX = BallR;
+                _ballX = left + _ballR;
                 _ballVx = Math.Abs(_ballVx);
                 WallSpark(_ballX, _ballY);
             }
-            else if (_ballX + BallR > _w)
+            else if (_ballX + _ballR > right)
             {
-                _ballX = _w - BallR;
+                _ballX = right - _ballR;
                 _ballVx = -Math.Abs(_ballVx);
                 WallSpark(_ballX, _ballY);
             }
 
-            if (_ballY - BallR < 0f)
+            if (_ballY - _ballR < topWall)
             {
-                _ballY = BallR;
+                _ballY = topWall + _ballR;
                 _ballVy = Math.Abs(_ballVy);
                 WallSpark(_ballX, _ballY);
             }
@@ -347,8 +447,8 @@ internal sealed class GameScene : IDemoScene
             // Bricks.
             CheckBricks();
 
-            // Fell off the bottom?
-            if (_ballY - BallR > _h)
+            // Fell off the bottom of the playfield?
+            if (_ballY - _ballR > _fieldY + _fieldH)
             {
                 LoseLife();
                 return;
@@ -373,7 +473,7 @@ internal sealed class GameScene : IDemoScene
         float px = _paddleX;
         float py = PaddleY;
         float halfW = _paddleW * 0.5f;
-        float halfH = PaddleH * 0.5f;
+        float halfH = _paddleH * 0.5f;
 
         // Only deflect when moving downward and overlapping.
         if (_ballVy <= 0f)
@@ -386,7 +486,7 @@ internal sealed class GameScene : IDemoScene
         float dx = _ballX - nearestX;
         float dy = _ballY - nearestY;
 
-        if (dx * dx + dy * dy <= BallR * BallR)
+        if (dx * dx + dy * dy <= _ballR * _ballR)
         {
             // Angle depends on where it hit the paddle.
             float rel = (_ballX - px) / halfW;       // -1..1
@@ -395,11 +495,11 @@ internal sealed class GameScene : IDemoScene
             float maxAngle = (float)(Math.PI * 0.40); // up to ~72deg from vertical
             float angle = -(float)(Math.PI / 2) + rel * maxAngle;
 
-            float spd = _baseSpeed * _speedMul;
+            float spd = BallSpeed;
             _ballVx = (float)Math.Cos(angle) * spd;
             _ballVy = (float)Math.Sin(angle) * spd;
 
-            _ballY = py - halfH - BallR - 0.5f;
+            _ballY = py - halfH - _ballR - 0.5f;
 
             _combo = 0; // reset combo when paddle is touched
             _shake = Math.Max(_shake, 4f);
@@ -422,11 +522,11 @@ internal sealed class GameScene : IDemoScene
             float dx = _ballX - nearestX;
             float dy = _ballY - nearestY;
 
-            if (dx * dx + dy * dy <= BallR * BallR)
+            if (dx * dx + dy * dy <= _ballR * _ballR)
             {
                 // Decide reflection axis: compare penetration on each axis.
-                float overlapX = (BallR) - Math.Abs(dx);
-                float overlapY = (BallR) - Math.Abs(dy);
+                float overlapX = (_ballR) - Math.Abs(dx);
+                float overlapY = (_ballR) - Math.Abs(dy);
 
                 // If the ball center is inside on one axis, use the other.
                 bool insideX = _ballX > b.X && _ballX < b.X + b.W;
@@ -546,7 +646,7 @@ internal sealed class GameScene : IDemoScene
         _shake = 14f;
         _combo = 0;
         _ballTrail.Clear();
-        Burst(_ballX, _h - 8f, new SKColor(0xFF, 0x4D, 0x6D), 26);
+        Burst(_ballX, _fieldY + _fieldH - 8f, new SKColor(0xFF, 0x4D, 0x6D), 26);
 
         if (_lives <= 0)
         {
@@ -646,18 +746,22 @@ internal sealed class GameScene : IDemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
-        bool firstSize = !_haveSize;
+        // Ignore degenerate/transient sizes (e.g. a near-zero first frame before
+        // layout settles) so they can't poison the cached layout.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
         _w = width;
         _h = height;
         _haveSize = true;
 
-        if (firstSize)
+        // Recompute all size-dependent layout whenever the canvas size changes
+        // (including the first valid frame), so content reflows on resize.
+        if (width != _lastLayoutW || height != _lastLayoutH)
         {
-            _paddleX = _w / 2f;
-            if (_state == State.Ready)
-            {
-                ResetBallOnPaddle();
-            }
+            Layout();
         }
 
         canvas.Save();
@@ -799,14 +903,14 @@ internal sealed class GameScene : IDemoScene
             float t = (i + 1) / (float)_ballTrail.Count;
             byte a = (byte)(120 * t);
             paint.Color = new SKColor(0x9E, 0xE7, 0xFF, a);
-            canvas.DrawCircle(_ballTrail[i].x, _ballTrail[i].y, BallR * (0.4f + 0.6f * t), paint);
+            canvas.DrawCircle(_ballTrail[i].x, _ballTrail[i].y, _ballR * (0.4f + 0.6f * t), paint);
         }
     }
 
     private void DrawPaddle(SKCanvas canvas)
     {
         float px = _paddleX - _paddleW / 2f;
-        float py = PaddleY - PaddleH / 2f;
+        float py = PaddleY - _paddleH / 2f;
 
         // Glow.
         using (var glow = new SKPaint
@@ -817,13 +921,13 @@ internal sealed class GameScene : IDemoScene
             Color = new SKColor(0x4D, 0xC4, 0xFF, 120),
         })
         {
-            canvas.DrawRoundRect(px, py, _paddleW, PaddleH, 9, 9, glow);
+            canvas.DrawRoundRect(px, py, _paddleW, _paddleH, 9, 9, glow);
         }
 
         using var fill = new SKPaint { IsAntialias = true };
         using (var grad = SKShader.CreateLinearGradient(
             new SKPoint(px, py),
-            new SKPoint(px, py + PaddleH),
+            new SKPoint(px, py + _paddleH),
             new[]
             {
                 new SKColor(0xBF, 0xF0, 0xFF),
@@ -834,11 +938,11 @@ internal sealed class GameScene : IDemoScene
             SKShaderTileMode.Clamp))
         {
             fill.Shader = grad;
-            canvas.DrawRoundRect(px, py, _paddleW, PaddleH, 9, 9, fill);
+            canvas.DrawRoundRect(px, py, _paddleW, _paddleH, 9, 9, fill);
         }
 
         using var hi = new SKPaint { Color = new SKColor(0xFF, 0xFF, 0xFF, 90), IsAntialias = true };
-        canvas.DrawRoundRect(px + 4, py + 3, _paddleW - 8, PaddleH * 0.32f, 5, 5, hi);
+        canvas.DrawRoundRect(px + 4, py + 3, _paddleW - 8, _paddleH * 0.32f, 5, 5, hi);
     }
 
     private void DrawBall(SKCanvas canvas)
@@ -852,13 +956,13 @@ internal sealed class GameScene : IDemoScene
             Color = new SKColor(0xFF, 0xF4, 0xC8, 200),
         })
         {
-            canvas.DrawCircle(_ballX, _ballY, BallR * 1.6f, glow);
+            canvas.DrawCircle(_ballX, _ballY, _ballR * 1.6f, glow);
         }
 
         using var fill = new SKPaint { IsAntialias = true };
         using (var grad = SKShader.CreateRadialGradient(
-            new SKPoint(_ballX - BallR * 0.3f, _ballY - BallR * 0.3f),
-            BallR * 1.4f,
+            new SKPoint(_ballX - _ballR * 0.3f, _ballY - _ballR * 0.3f),
+            _ballR * 1.4f,
             new[]
             {
                 new SKColor(0xFF, 0xFF, 0xFF),
@@ -869,7 +973,7 @@ internal sealed class GameScene : IDemoScene
             SKShaderTileMode.Clamp))
         {
             fill.Shader = grad;
-            canvas.DrawCircle(_ballX, _ballY, BallR, fill);
+            canvas.DrawCircle(_ballX, _ballY, _ballR, fill);
         }
     }
 

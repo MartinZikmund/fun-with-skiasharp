@@ -143,6 +143,17 @@ internal sealed class DemoScene : IDemoScene
 
     public void Draw(SKCanvas canvas, float width, float height)
     {
+        // Guard against degenerate/transient sizes (e.g. a near-zero first frame
+        // before layout settles). Drawing here would divide by ~0 below and poison
+        // _energy with NaN. All layout is derived from width/height each frame, so
+        // skipping a bad frame can't leave stale state behind.
+        if (width <= 1f || height <= 1f)
+        {
+            return;
+        }
+
+        // All size-dependent layout is recomputed from the CURRENT width/height every
+        // frame, so the scene reflows automatically on resize / any aspect ratio.
         float cx = width / 2f, cy = height / 2f;
         float minDim = MathF.Min(width, height);
 
