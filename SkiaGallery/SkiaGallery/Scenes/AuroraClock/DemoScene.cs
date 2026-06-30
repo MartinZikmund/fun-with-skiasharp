@@ -13,7 +13,7 @@ namespace SkiaGallery.Scenes.AuroraClock;
 //
 // Pure SkiaSharp + System only (no Uno types) so the same code renders the
 // headless thumbnail (Thumb.cs) and runs live on the UI canvas (DemoCanvas.cs).
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

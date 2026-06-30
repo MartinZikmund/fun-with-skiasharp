@@ -15,7 +15,7 @@ namespace SkiaGallery.Scenes.SkiaPong;
 // Left paddle: mouse Y or W/S. Right paddle: AI tracker (or human Up/Down).
 // Ball bounces off paddles/walls, contact point shapes the angle, rally speeds it up.
 // First to 7 wins. Click/Space serves and restarts.
-internal sealed class GameScene : IDemoScene
+internal sealed partial class GameScene : IDemoScene
 {
     private const int WinScore = 7;
     private const float PaddleW = 16f;

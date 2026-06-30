@@ -11,7 +11,7 @@ namespace SkiaGallery.Scenes.ShaderGalaxy;
 //
 // Kept Uno-free (SkiaSharp + System only) so Thumb.cs renders it headless.
 // Seam preserved: ctor / Update / Draw / PointerDown|Move|Up / Wheel / Reset.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

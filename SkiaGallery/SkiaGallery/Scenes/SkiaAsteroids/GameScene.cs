@@ -11,7 +11,7 @@ namespace SkiaGallery.Scenes.SkiaAsteroids;
 // Public seam (KEEP so DemoCanvas.cs + Thumb.cs compile):
 //   ctor(); Update(dt); Draw(canvas, w, h);
 //   PointerDown/Move/Up(x,y); Wheel(delta); KeyDown(key); KeyUp(key); Reset();
-internal sealed class GameScene : IDemoScene
+internal sealed partial class GameScene : IDemoScene
 {
     private enum State { Playing, Dead, GameOver }
 

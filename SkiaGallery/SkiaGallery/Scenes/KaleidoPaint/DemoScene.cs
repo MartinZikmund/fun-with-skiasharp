@@ -12,7 +12,7 @@ namespace SkiaGallery.Scenes.KaleidoPaint;
 // mandala drifts with a gentle rotation.
 //
 // Uno-free (SkiaSharp + System only) so the same code renders headless thumbnails.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

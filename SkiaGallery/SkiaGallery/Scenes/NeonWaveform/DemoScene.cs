@@ -14,7 +14,7 @@ namespace SkiaGallery.Scenes.NeonWaveform;
 // Pointer drives the "energy": distance from center => intensity & tempo.
 //
 // Pure SkiaSharp + System only (no Uno types) so Thumb.cs can render headless.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

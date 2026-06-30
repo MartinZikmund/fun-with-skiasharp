@@ -10,7 +10,7 @@ namespace SkiaGallery.Scenes.AuroraFireworks;
 //
 // Public seam (kept for DemoCanvas.cs + Thumb.cs):
 //   ctor / Update(dt) / Draw(canvas,w,h) / PointerDown/Move/Up / Wheel / Reset
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

@@ -14,7 +14,7 @@ namespace SkiaGallery.Scenes.HyperWarp;
 // neon streak from where the star *was* to where it *is* - the faster the warp,
 // the longer the streak. Additive blending + a soft glow pass sell the speed.
 // The mouse steers the vanishing point and pushes the throttle near screen edges.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

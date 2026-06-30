@@ -11,7 +11,7 @@ namespace SkiaGallery.Scenes.SpiroHarmonograph;
 //
 // Pure SkiaSharp + System only (no Uno types) so the identical code renders both the
 // live UI canvas (DemoCanvas) and the headless thumbnail (Thumb).
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

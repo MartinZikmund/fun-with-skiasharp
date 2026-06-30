@@ -13,7 +13,7 @@ namespace SkiaGallery.Scenes.SkiaFlap;
 // Public seam (kept stable for DemoCanvas.cs + Thumb.cs):
 //   ctor(); Update(dt); Draw(canvas,w,h);
 //   PointerDown/Move/Up(x,y); Wheel(delta); KeyDown(key); KeyUp(key); Reset();
-internal sealed class GameScene : IDemoScene
+internal sealed partial class GameScene : IDemoScene
 {
     private enum Phase { Ready, Playing, Dead }
 

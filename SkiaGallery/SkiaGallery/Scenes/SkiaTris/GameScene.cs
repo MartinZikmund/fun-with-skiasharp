@@ -13,7 +13,7 @@ namespace SkiaGallery.Scenes.SkiaTris;
 // Seam kept intact:
 //   ctor(); Update(dt); Draw(canvas,w,h);
 //   PointerDown/Move/Up(x,y); Wheel(delta); KeyDown(key); KeyUp(key); Reset();
-internal sealed class GameScene : IDemoScene
+internal sealed partial class GameScene : IDemoScene
 {
     private const int Cols = 10;
     private const int Rows = 20;

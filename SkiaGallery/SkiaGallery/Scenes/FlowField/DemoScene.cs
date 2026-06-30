@@ -10,7 +10,7 @@ namespace SkiaGallery.Scenes.FlowField;
 // The pointer bends the flow into a swirling vortex / attractor.
 //
 // Pure SkiaSharp + System only, so the exact same code renders headless thumbnails.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

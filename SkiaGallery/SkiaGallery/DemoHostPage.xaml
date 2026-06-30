@@ -4,27 +4,39 @@
       xmlns:core="using:SkiaGallery.Core"
       Background="#06070D">
 
+  <!-- Root: keyboard focus + key routing only. -->
   <Grid x:Name="Root" Background="Transparent" IsTabStop="True" UseSystemFocusVisuals="False"
-        Loaded="OnLoaded"
-        LostFocus="OnLostFocus"
-        KeyDown="OnKeyDown" KeyUp="OnKeyUp"
-        PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved"
-        PointerReleased="OnPointerReleased" PointerWheelChanged="OnPointerWheel">
+        Loaded="OnLoaded" LostFocus="OnLostFocus" KeyDown="OnKeyDown" KeyUp="OnKeyUp">
 
-    <core:GalleryCanvas x:Name="Canvas" />
+    <!-- Input layer: pointer events + capture live here (and the canvas). Overlays sit
+         ABOVE this layer as siblings, so clicking a control never triggers canvas capture. -->
+    <Grid x:Name="InputLayer" Background="Transparent"
+          PointerPressed="OnPointerPressed" PointerMoved="OnPointerMoved"
+          PointerReleased="OnPointerReleased" PointerWheelChanged="OnPointerWheel">
+      <core:GalleryCanvas x:Name="Canvas" />
+    </Grid>
 
-    <!-- Compact auto-hiding overlay (Back + demo name). Fades out during play so it
-         never covers the sample's own title/HUD; reappears on pointer movement. -->
+    <!-- Compact auto-hiding Back pill (top-left). -->
     <Border x:Name="Hud" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
             Background="#B3000000" CornerRadius="10" Padding="8,5">
       <Border.OpacityTransition>
         <ScalarTransition Duration="0:0:0.35" />
       </Border.OpacityTransition>
       <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-        <Button Content="&#8592; Back" Click="OnBack" Padding="10,4" />
+        <Button x:Name="BackButton" Content="&#8592; Back" Click="OnBack" Padding="10,4" />
         <TextBlock x:Name="TitleText" Foreground="#EEF1FB" FontWeight="SemiBold"
                    FontSize="14" VerticalAlignment="Center" />
       </StackPanel>
+    </Border>
+
+    <!-- Per-demo controls (bottom-center), populated from IDemoControls; auto-hides too. -->
+    <Border x:Name="ControlsBar" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+            Margin="0,0,0,24" Padding="12,8" Visibility="Collapsed"
+            Background="#B0101022" CornerRadius="14" BorderBrush="#33FFFFFF" BorderThickness="1">
+      <Border.OpacityTransition>
+        <ScalarTransition Duration="0:0:0.35" />
+      </Border.OpacityTransition>
+      <StackPanel x:Name="ControlsPanel" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" />
     </Border>
   </Grid>
 </Page>

@@ -2,7 +2,9 @@ using System;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using SkiaGallery.Core;
 
@@ -10,18 +12,13 @@ namespace SkiaGallery;
 
 public sealed partial class DemoHostPage : Page
 {
-    private readonly DispatcherTimer _hudTimer = new() { Interval = TimeSpan.FromSeconds(2.5) };
+    private readonly DispatcherTimer _hudTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private bool _active;
 
     public DemoHostPage()
     {
         this.InitializeComponent();
-        _hudTimer.Tick += (_, _) =>
-        {
-            _hudTimer.Stop();
-            Hud.Opacity = 0;
-            Hud.IsHitTestVisible = false; // faded -> let clicks reach the canvas, no accidental Back
-        };
+        _hudTimer.Tick += (_, _) => { _hudTimer.Stop(); SetChromeVisible(false); };
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -31,9 +28,11 @@ public sealed partial class DemoHostPage : Page
         if (e.Parameter is string name && DemoCatalog.ByName(name) is { } entry)
         {
             TitleText.Text = $"{entry.RankLabel}   {entry.Name}";
-            Canvas.SetScene(entry.Factory());
+            var scene = entry.Factory();
+            Canvas.SetScene(scene);
+            BuildControls(scene);
         }
-        ShowHud();
+        ShowChrome();
         GrabFocus();
     }
 
@@ -42,22 +41,92 @@ public sealed partial class DemoHostPage : Page
         base.OnNavigatedFrom(e);
         _active = false;
         _hudTimer.Stop();
-        Canvas.Stop(); // detach CompositionTarget.Rendering when leaving the demo
+        Canvas.Stop();
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e) => GrabFocus();
 
-    // Reveal the overlay, then auto-hide after a pause so it never blocks the demo.
-    private void ShowHud()
+    // --- chrome (Back pill + controls bar) auto-hide ---------------------------
+
+    private void ShowChrome()
     {
-        Hud.Opacity = 1;
-        Hud.IsHitTestVisible = true;
+        SetChromeVisible(true);
         _hudTimer.Stop();
         _hudTimer.Start();
     }
 
-    // Auto-focus the play surface so keyboard demos are immediately playable.
-    // Deferred to after layout (WASM needs the element realized before focus sticks).
+    private void SetChromeVisible(bool visible)
+    {
+        Hud.Opacity = visible ? 1 : 0;
+        Hud.IsHitTestVisible = visible;
+        if (ControlsBar.Visibility == Visibility.Visible)
+        {
+            ControlsBar.Opacity = visible ? 1 : 0;
+            ControlsBar.IsHitTestVisible = visible;
+        }
+    }
+
+    private void BuildControls(IDemoScene scene)
+    {
+        ControlsPanel.Children.Clear();
+        if (scene is not IDemoControls c)
+        {
+            ControlsBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        bool any = false;
+
+        foreach (var s in c.Sliders)
+        {
+            any = true;
+            ControlsPanel.Children.Add(new TextBlock
+            {
+                Text = s.Label,
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.White),
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            var slider = new Slider
+            {
+                Minimum = s.Min,
+                Maximum = s.Max,
+                Value = s.Value,
+                Width = 150,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            if (s.Step > 0)
+            {
+                slider.StepFrequency = s.Step;
+            }
+            var set = s.Set;
+            slider.ValueChanged += (_, e) => set(e.NewValue);
+            ControlsPanel.Children.Add(slider);
+        }
+
+        foreach (var t in c.Toggles)
+        {
+            any = true;
+            var toggle = new ToggleButton { Content = t.Label, IsChecked = t.Initial };
+            var set = t.Set;
+            toggle.Checked += (_, _) => set(true);
+            toggle.Unchecked += (_, _) => set(false);
+            ControlsPanel.Children.Add(toggle);
+        }
+
+        foreach (var b in c.Buttons)
+        {
+            any = true;
+            var button = new Button { Content = b.Label };
+            var invoke = b.Invoke;
+            button.Click += (_, _) => invoke();
+            ControlsPanel.Children.Add(button);
+        }
+
+        ControlsBar.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // --- focus -----------------------------------------------------------------
+
     private void GrabFocus()
     {
         DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
@@ -69,9 +138,8 @@ public sealed partial class DemoHostPage : Page
         });
     }
 
-    // Keep keyboard focus on the surface until we navigate away (UnoDoom-style), BUT only
-    // re-grab when focus was lost to nothing. If focus moved to a real control (the Back
-    // button), leave it - otherwise we'd steal focus mid-click and the button wouldn't fire.
+    // Reclaim focus only if it drifted to nothing - never when it moved to a real
+    // control (Back / a control-bar button), or we'd steal focus mid-click.
     private void OnLostFocus(object sender, RoutedEventArgs e)
     {
         if (!_active)
@@ -86,10 +154,9 @@ public sealed partial class DemoHostPage : Page
         }
         catch
         {
-            // ignore; treat as unknown focus
+            // ignore
         }
 
-        // Only reclaim focus if it drifted to nothing (e.g. an unfocusable click target).
         if (focused is null)
         {
             GrabFocus();
@@ -103,6 +170,8 @@ public sealed partial class DemoHostPage : Page
             Frame.GoBack();
         }
     }
+
+    // --- input forwarding ------------------------------------------------------
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -118,16 +187,16 @@ public sealed partial class DemoHostPage : Page
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        ShowHud();
+        ShowChrome();
         GrabFocus();
         var p = e.GetCurrentPoint(Canvas).Position;
         Canvas.PointerDown(p.X, p.Y);
-        Root.CapturePointer(e.Pointer);
+        InputLayer.CapturePointer(e.Pointer);
     }
 
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        ShowHud();
+        ShowChrome();
         var p = e.GetCurrentPoint(Canvas).Position;
         Canvas.PointerMove(p.X, p.Y);
     }
@@ -136,7 +205,7 @@ public sealed partial class DemoHostPage : Page
     {
         var p = e.GetCurrentPoint(Canvas).Position;
         Canvas.PointerUp(p.X, p.Y);
-        Root.ReleasePointerCapture(e.Pointer);
+        InputLayer.ReleasePointerCapture(e.Pointer);
     }
 
     private void OnPointerWheel(object sender, PointerRoutedEventArgs e)

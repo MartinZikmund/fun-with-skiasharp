@@ -8,7 +8,7 @@ namespace SkiaGallery.Scenes.LifeBloom;
 // A toroidal (wrapping) grid; living cells are tinted by age (fresh -> mature gradient)
 // and dying cells leave a fading colored trail, so motion reads like blooming and decay.
 // Pure SkiaSharp + System only (no Uno types) so the same code renders headless thumbnails.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

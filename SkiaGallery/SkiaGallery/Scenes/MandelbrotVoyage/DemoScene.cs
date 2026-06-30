@@ -14,7 +14,7 @@ namespace SkiaGallery.Scenes.MandelbrotVoyage;
 //     is mesmerizing even when untouched
 //
 // Pure SkiaSharp + System only (no Uno types) so the same code renders headless thumbs.
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

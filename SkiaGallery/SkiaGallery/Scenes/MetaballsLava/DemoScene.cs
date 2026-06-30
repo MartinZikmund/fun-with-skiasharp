@@ -11,7 +11,7 @@ namespace SkiaGallery.Scenes.MetaballsLava;
 //
 // Seam (kept for Thumb.cs + DemoCanvas.cs):
 //   ctor / Update(dt) / Draw(canvas,w,h) / PointerDown/Move/Up / Wheel / Reset
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }

@@ -13,7 +13,7 @@ namespace SkiaGallery.Scenes.SkiaBreakout;
 //
 // Pure SkiaSharp + System only (no Uno types) so the same code renders headless thumbnails.
 // Public seam kept intact: ctor, Update, Draw, PointerDown/Move/Up, Wheel, KeyDown/Up, Reset.
-internal sealed class GameScene : IDemoScene
+internal sealed partial class GameScene : IDemoScene
 {
     private enum State { Ready, Playing, Won, Lost }
 

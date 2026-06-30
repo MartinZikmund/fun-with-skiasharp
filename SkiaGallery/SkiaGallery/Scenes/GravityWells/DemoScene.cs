@@ -13,7 +13,7 @@ namespace SkiaGallery.Scenes.GravityWells;
 //
 // Pure SkiaSharp + System only (no Uno types) so the same code renders headless
 // thumbnails (Thumb.cs) and runs live on the canvas (DemoCanvas.cs).
-internal sealed class DemoScene : IDemoScene
+internal sealed partial class DemoScene : IDemoScene
 {
 
     public void KeyDown(string key) { }
