@@ -24,7 +24,10 @@ _research_doc.md
 
 # ---- Throwaway probes & generated artifacts ----
 _probe/
+_wasmpub/
+_wasmpub2/
 gallery_full.png
+wasm_boot.png
 _tools/*.png
 _tools/**/bin/
 _tools/**/obj/

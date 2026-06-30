@@ -1,0 +1,68 @@
+name: Deploy WASM gallery to GitHub Pages
+
+# Publishes the SkiaGallery Uno WebAssembly app to GitHub Pages.
+# The site is a project page at https://<user>.github.io/fun-with-skiasharp/, so the
+# Uno bootstrapper is told to serve its support files from that sub-path via
+# WasmShellWebAppBasePath. Enable Pages once under Settings -> Pages -> Source: GitHub Actions.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'SkiaGallery/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Publish WASM (sub-path base href)
+        run: >
+          dotnet publish SkiaGallery/SkiaGallery/SkiaGallery.csproj
+          -c Release -f net10.0-browserwasm
+          -p:WasmShellWebAppBasePath=/fun-with-skiasharp/
+          -o ${{ runner.temp }}/dist
+
+      - name: GitHub Pages tweaks (.nojekyll + SPA fallback)
+        run: |
+          touch "${{ runner.temp }}/dist/wwwroot/.nojekyll"
+          cp "${{ runner.temp }}/dist/wwwroot/index.html" "${{ runner.temp }}/dist/wwwroot/404.html"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/dist/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

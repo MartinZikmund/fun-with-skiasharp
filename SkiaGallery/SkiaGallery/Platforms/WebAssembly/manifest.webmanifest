@@ -1,0 +1,10 @@
+{
+  "background_color": "#ffffff",
+  "description": "SkiaGallery",
+  "display": "standalone",
+  "name": "SkiaGallery",
+  "short_name": "SkiaGallery",
+  "start_url": "/index.html",
+  "theme_color": "#ffffff",
+  "scope": "/"
+}
